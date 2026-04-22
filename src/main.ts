@@ -327,7 +327,9 @@ export default class VoxPlugin extends Plugin {
     try {
       this.player.setRate(this.settings.rate);
       await this.player.play(text, voice);
-      new Notice(`Vox: reading "${file.basename}"...`);
+      if (this.settings.showStartNotice) {
+        new Notice(`Vox: reading "${file.basename}"...`);
+      }
     } catch (err) {
       console.error("Vox playback failed:", err);
       new Notice(`Vox: ${(err as Error).message}`);

@@ -28,6 +28,9 @@ export interface VoxSettings {
 
   folderVoicesByEngine: Record<TtsEngine, Record<string, string>>;
 
+  /** Whether to show a notice when playback starts. */
+  showStartNotice: boolean;
+
   cacheEnabled: boolean;
 }
 
@@ -48,6 +51,7 @@ export const DEFAULT_SETTINGS: VoxSettings = {
     elevenlabs: {},
     openai: {},
   },
+  showStartNotice: true,
   cacheEnabled: false,
 };
 
@@ -108,6 +112,16 @@ export class VoxSettingTab extends PluginSettingTab {
             s.rate = v;
             await this.plugin.saveSettings();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName("Show start notification")
+      .setDesc('Show a notice like "Vox: reading ..." when playback begins.')
+      .addToggle((tg) =>
+        tg.setValue(s.showStartNotice).onChange(async (value) => {
+          s.showStartNotice = value;
+          await this.plugin.saveSettings();
+        }),
       );
 
     // ── Provider-specific settings ────────────────────────────────
