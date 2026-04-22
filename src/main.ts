@@ -30,6 +30,34 @@ const ICON_PAUSE = "vox-pause";
 const ICON_PLAY = "vox-play";
 const ICON_STOP = "vox-stop";
 
+/** Move HTML `title` to `data-vox-title-stash` on `root` and descendants so the native tooltip does not compete with custom UI. */
+function stashNativeTitles(root: HTMLElement) {
+  const candidates = [
+    root,
+    ...Array.from(root.querySelectorAll<HTMLElement>("[title]")),
+  ];
+  for (const el of [...new Set(candidates)]) {
+    const t = el.getAttribute("title");
+    if (!t) continue;
+    el.setAttribute("data-vox-title-stash", t);
+    el.removeAttribute("title");
+  }
+}
+
+function restoreNativeTitles(root: HTMLElement) {
+  const withStash: HTMLElement[] = [];
+  if (root.hasAttribute("data-vox-title-stash")) withStash.push(root);
+  withStash.push(
+    ...Array.from(root.querySelectorAll<HTMLElement>("[data-vox-title-stash]")),
+  );
+  for (const el of [...new Set(withStash)]) {
+    const t = el.getAttribute("data-vox-title-stash");
+    if (t) el.setAttribute("title", t);
+    else el.removeAttribute("title");
+    el.removeAttribute("data-vox-title-stash");
+  }
+}
+
 const ICONS: Record<string, string> = {
   [ICON_READ]: `
 <svg viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -66,6 +94,7 @@ export default class VoxPlugin extends Plugin {
   private unsubscribeState: (() => void) | null = null;
   private pendingVoice: string | null = null;
   private voicePickerEl: HTMLElement | null = null;
+  private tooltipObserver: MutationObserver | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -96,7 +125,8 @@ export default class VoxPlugin extends Plugin {
       () => this.player.stop(),
     );
     this.stopRibbonEl.addClass("vox-ribbon");
-    this.stopRibbonEl.style.display = "none";
+    this.stopRibbonEl.addClass("vox-ribbon--stop");
+    this.applyStopRibbonVisibility(false);
 
     // ── Status bar ──────────────────────────────────────────────
     // Single clickable pill that shows current playback state.
@@ -148,18 +178,100 @@ export default class VoxPlugin extends Plugin {
       this.renderState(s),
     );
 
+    // Ribbon layout can finish (or re-apply theme styles) after onload; re-sync
+    // visibility so the stop control stays hidden until a real session.
+    this.app.workspace.onLayoutReady(() => {
+      this.applyStopRibbonVisibility(this.player.getState() !== "idle");
+      requestAnimationFrame(() => {
+        this.applyStopRibbonVisibility(this.player.getState() !== "idle");
+      });
+    });
+
     this.addSettingTab(new VoxSettingTab(this.app, this));
   }
 
   async onunload() {
     this.unsubscribeState?.();
     this.player?.stop();
+    this.stopSuppressingRibbonTooltip();
+  }
+
+  private hideMatchingRibbonTooltips(label: string) {
+    const normalized = label.trim();
+    if (!normalized) return;
+
+    for (const tooltip of Array.from(
+      document.body.querySelectorAll<HTMLElement>(".tooltip"),
+    )) {
+      if (tooltip.getAttribute("data-vox-hidden-tooltip") === "true") continue;
+      if (tooltip.textContent?.trim() !== normalized) continue;
+      tooltip.setAttribute("data-vox-hidden-tooltip", "true");
+      tooltip.style.display = "none";
+    }
+  }
+
+  private startSuppressingRibbonTooltip(label: string) {
+    this.stopSuppressingRibbonTooltip();
+    const normalized = label.trim();
+    if (!normalized) return;
+
+    this.hideMatchingRibbonTooltips(normalized);
+    this.tooltipObserver = new MutationObserver(() => {
+      this.hideMatchingRibbonTooltips(normalized);
+    });
+    this.tooltipObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  private stopSuppressingRibbonTooltip() {
+    this.tooltipObserver?.disconnect();
+    this.tooltipObserver = null;
+
+    for (const tooltip of Array.from(
+      document.body.querySelectorAll<HTMLElement>(
+        '.tooltip[data-vox-hidden-tooltip="true"]',
+      ),
+    )) {
+      tooltip.style.removeProperty("display");
+      tooltip.removeAttribute("data-vox-hidden-tooltip");
+    }
   }
 
   /**
    * Repaint the status bar + pause ribbon icon to reflect player state.
    * Called synchronously by the Player's state-change event.
    */
+  /** Wrapper around the stop icon; often `.side-dock-ribbon-action`. */
+  private getStopRibbonSlot(): HTMLElement | null {
+    if (!this.stopRibbonEl) return null;
+    return (
+      (this.stopRibbonEl.closest(
+        ".side-dock-ribbon-action",
+      ) as HTMLElement | null) ?? (this.stopRibbonEl.parentElement as HTMLElement | null)
+    );
+  }
+
+  /**
+   * Show or hide the stop control. Uses inline `display` with `important` so
+   * it wins over theme `!important` rules, and hides the full ribbon slot so
+   * there is no empty gap.
+   */
+  private applyStopRibbonVisibility(active: boolean) {
+    if (!this.stopRibbonEl) return;
+    this.stopRibbonEl.classList.toggle("vox-ribbon--stop--visible", active);
+    const icon = this.stopRibbonEl;
+    const slot = this.getStopRibbonSlot();
+    if (active) {
+      icon.style.removeProperty("display");
+      slot?.style.removeProperty("display");
+    } else {
+      icon.style.setProperty("display", "none", "important");
+      slot?.style.setProperty("display", "none", "important");
+    }
+  }
+
   private renderState(state: PlayerState) {
     const active = state !== "idle";
 
@@ -170,9 +282,7 @@ export default class VoxPlugin extends Plugin {
       this.readRibbonEl.setAttribute("aria-label", label);
     }
 
-    if (this.stopRibbonEl) {
-      this.stopRibbonEl.style.display = active ? "" : "none";
-    }
+    this.applyStopRibbonVisibility(active);
 
     if (this.statusEl) {
       this.statusEl.empty();
@@ -244,6 +354,8 @@ export default class VoxPlugin extends Plugin {
       this.voicePickerEl = null;
       const label = anchor.getAttribute("data-vox-label");
       if (label) anchor.setAttribute("aria-label", label);
+      this.stopSuppressingRibbonTooltip();
+      restoreNativeTitles(anchor);
     };
 
     const openPicker = () => {
@@ -251,14 +363,18 @@ export default class VoxPlugin extends Plugin {
       const voices = getVoices();
       if (voices.length === 0) return;
 
-      // Stash the current aria-label and clear it so Obsidian's native
-      // tooltip doesn't appear alongside the picker.
+      closePicker();
+
+      // Stash aria-label + HTML title and clear them so Obsidian's / the
+      // browser's native tooltip doesn't appear alongside the picker.
       if (!anchor.getAttribute("data-vox-label")) {
         anchor.setAttribute("data-vox-label", anchor.getAttribute("aria-label") ?? "");
       }
+      const label = anchor.getAttribute("data-vox-label") ?? "";
       anchor.removeAttribute("aria-label");
+      stashNativeTitles(anchor);
+      this.startSuppressingRibbonTooltip(label);
 
-      closePicker();
       const picker = document.body.createEl("div", { cls: "vox-voice-picker" });
       this.voicePickerEl = picker;
 
@@ -277,7 +393,7 @@ export default class VoxPlugin extends Plugin {
       }
 
       const rect = anchor.getBoundingClientRect();
-      picker.style.left = `${rect.right + 4}px`;
+      picker.style.left = `${rect.right + 10}px`;
       picker.style.top = `${rect.top}px`;
 
       picker.addEventListener("mouseenter", () => clearTimeout(closeTimer));

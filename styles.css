@@ -2,6 +2,21 @@
   transform: scale(1.2);
 }
 
+/* Hide the stop action until there is a playing or paused session. Themes
+   often set .clickable-icon { display: flex !important; }, which beats a
+   plain inline display:none, so this rule uses !important as well. */
+.vox-ribbon--stop:not(.vox-ribbon--stop--visible) {
+  display: none !important;
+}
+
+/* Hide the full ribbon slot (no gap) when the stop control is not active. */
+body .workspace-ribbon
+  .side-dock-ribbon-action:has(
+    .vox-ribbon--stop:not(.vox-ribbon--stop--visible)
+  ) {
+  display: none !important;
+}
+
 .vox-status {
   cursor: pointer;
   display: inline-flex;
