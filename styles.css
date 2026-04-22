@@ -1,0 +1,25 @@
+.rhapsode-status {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-accent);
+}
+
+.rhapsode-status:hover {
+  color: var(--text-accent-hover);
+}
+
+.rhapsode-status-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.rhapsode-status-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.rhapsode-status-text {
+  font-size: var(--status-bar-font-size);
+}

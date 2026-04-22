@@ -1,0 +1,22 @@
+{
+  "name": "rhapsode",
+  "version": "0.1.0",
+  "description": "Reads your Obsidian notes aloud with neural text-to-speech.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "typecheck": "tsc -noEmit -skipLibCheck"
+  },
+  "keywords": ["obsidian", "tts", "text-to-speech", "voice", "piper", "elevenlabs"],
+  "author": "danialkalbasi",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.7.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.4.0"
+  }
+}
