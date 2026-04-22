@@ -1,288 +1,342 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import type RhapsodePlugin from "./main";
+import type VoxPlugin from "./main";
 
-export type TtsEngine = "browser" | "elevenlabs" | "openai" | "piper";
+export type TtsEngine = "browser" | "elevenlabs" | "openai";
 
-export interface RhapsodeSettings {
-  /** Which TTS backend to use. `browser` uses the free built-in
-   *  SpeechSynthesis API (works offline, low quality). */
+export interface VoxSettings {
+  /** Active backend — only one runs at a time. */
   engine: TtsEngine;
 
-  /** Default voice identifier, meaning depends on the engine:
-   *   - browser: a voice `name` from speechSynthesis.getVoices()
-   *   - elevenlabs: a voice_id (e.g. "21m00Tcm4TlvDq8ikWAM")
-   *   - openai: one of "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer"
-   *   - piper: a voice model filename (e.g. "en_US-lessac-medium") */
-  defaultVoice: string;
-
-  /** Playback rate multiplier (1.0 = natural). Applied on the <audio>
-   *  element as `playbackRate`. */
+  /** Playback rate for `<audio>` and browser synth (1.0 = natural). */
   rate: number;
 
-  /** API keys for cloud engines. Stored in data.json inside the plugin
-   *  folder; treat as you would any other local secret. */
+  /** Per-engine default voices — never mix with API keys. */
+  voiceBrowser: string;
+  voiceOpenai: string;
+  voiceElevenlabs: string;
+
   elevenlabsApiKey: string;
   openaiApiKey: string;
 
-  /** Model tier when using elevenlabs (monolingual vs multilingual). */
   elevenlabsModel: string;
 
-  /** OpenAI TTS model — "tts-1" (fast) or "tts-1-hd" (better quality). */
+  /** Named voice library for ElevenLabs. */
+  elevenlabsVoices: Array<{ name: string; id: string }>;
+
   openaiModel: "tts-1" | "tts-1-hd";
+  openaiInstructions: string;
 
-  /**
-   * URL of a running Piper HTTP server, e.g. http://localhost:5000.
-   * Start one with `python3 -m piper.http_server -m <voice>`.
-   */
-  piperServerUrl: string;
+  folderVoicesByEngine: Record<TtsEngine, Record<string, string>>;
 
-  /**
-   * Folder-prefix → voice-id map for persona overrides.
-   * Example: { "Philosophy/": "epictetus-voice-id" }
-   * Longest prefix wins when multiple match.
-   */
-  folderVoices: Record<string, string>;
-
-  /** Cache generated audio to disk (by note-hash) to avoid re-billing. */
   cacheEnabled: boolean;
 }
 
-export const DEFAULT_SETTINGS: RhapsodeSettings = {
+export const DEFAULT_SETTINGS: VoxSettings = {
   engine: "browser",
-  defaultVoice: "",
   rate: 1.0,
+  voiceBrowser: "",
+  voiceOpenai: "alloy",
+  voiceElevenlabs: "",
   elevenlabsApiKey: "",
   openaiApiKey: "",
   elevenlabsModel: "eleven_turbo_v2_5",
+  elevenlabsVoices: [],
   openaiModel: "tts-1",
-  piperServerUrl: "http://localhost:5000",
-  folderVoices: {},
-  cacheEnabled: true,
+  openaiInstructions: "",
+  folderVoicesByEngine: {
+    browser: {},
+    elevenlabs: {},
+    openai: {},
+  },
+  cacheEnabled: false,
 };
 
-/**
- * Settings tab — reachable from Obsidian's Community Plugins settings.
- * Layout is intentionally flat (one vertical list of controls) rather
- * than tabbed sub-sections; the surface area is small enough that
- * extra structure would just add friction.
- */
-export class RhapsodeSettingTab extends PluginSettingTab {
-  private plugin: RhapsodePlugin;
+function section(containerEl: HTMLElement, title: string, desc?: string) {
+  containerEl.createEl("h3", { text: title });
+  if (desc) {
+    containerEl.createEl("p", { text: desc, cls: "setting-item-description" });
+  }
+}
 
-  constructor(app: App, plugin: RhapsodePlugin) {
+export class VoxSettingTab extends PluginSettingTab {
+  private plugin: VoxPlugin;
+
+  constructor(app: App, plugin: VoxPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
 
   display(): void {
     const { containerEl } = this;
+    const s = this.plugin.settings;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Rhapsode" });
-    containerEl.createEl("p", {
-      text: "Reads your notes aloud. Pick a backend, drop in an API key if needed, and assign persona voices per folder.",
-      cls: "setting-item-description",
-    });
+    containerEl.createEl("h2", { text: "Vox" });
 
     new Setting(containerEl)
       .setName("Engine")
-      .setDesc(
-        "Which text-to-speech backend to use. Browser = free, offline, robotic. ElevenLabs / OpenAI = paid API, natural voices. Piper = local neural TTS (not yet wired up).",
-      )
+      .setDesc("Which service reads your notes aloud.")
       .addDropdown((dd) =>
         dd
-          .addOption("browser", "Browser SpeechSynthesis (free)")
-          .addOption("openai", "OpenAI TTS")
           .addOption("elevenlabs", "ElevenLabs")
-          .addOption("piper", "Piper (local, desktop only)")
-          .setValue(this.plugin.settings.engine)
+          .addOption("openai", "OpenAI")
+          .addOption("browser", "Browser (free, no account needed)")
+          .setValue(s.engine)
           .onChange(async (value) => {
-            this.plugin.settings.engine = value as TtsEngine;
+            s.engine = value as TtsEngine;
             await this.plugin.saveSettings();
             this.display();
           }),
       );
 
+    const speedLimits: Record<TtsEngine, [number, number, number]> = {
+      elevenlabs: [0.7, 1.2, 0.05],
+      openai:     [0.25, 4.0, 0.05],
+      browser:    [0.6, 2.0, 0.05],
+    };
+    const [minSpeed, maxSpeed, step] = speedLimits[s.engine];
+    const clampedRate = Math.min(maxSpeed, Math.max(minSpeed, s.rate));
     new Setting(containerEl)
-      .setName("Default voice")
-      .setDesc(this.voiceHintForEngine(this.plugin.settings.engine))
-      .addText((t) =>
-        t
-          .setPlaceholder(this.voicePlaceholder(this.plugin.settings.engine))
-          .setValue(this.plugin.settings.defaultVoice)
-          .onChange(async (v) => {
-            this.plugin.settings.defaultVoice = v;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Playback rate")
-      .setDesc("1.0 is natural. 1.5 is brisk. 0.8 for contemplative reading.")
-      .addSlider((s) =>
-        s
-          .setLimits(0.6, 2.0, 0.05)
-          .setValue(this.plugin.settings.rate)
+      .setName("Speed")
+      .setDesc(`Playback speed. 1.0 is normal. Range: ${minSpeed}x – ${maxSpeed}x.`)
+      .addSlider((sl) =>
+        sl
+          .setLimits(minSpeed, maxSpeed, step)
+          .setValue(clampedRate)
           .setDynamicTooltip()
           .onChange(async (v) => {
-            this.plugin.settings.rate = v;
+            s.rate = v;
             await this.plugin.saveSettings();
           }),
       );
 
-    // ── API keys (only shown when relevant) ───────────────────────
-    if (this.plugin.settings.engine === "elevenlabs") {
+    // ── Provider-specific settings ────────────────────────────────
+    if (s.engine === "browser") {
+      section(containerEl, "Browser");
       new Setting(containerEl)
-        .setName("ElevenLabs API key")
-        .setDesc("From elevenlabs.io → Profile → API Key.")
+        .setName("Voice")
+        .setDesc("Name of the voice to use, e.g. Samantha or Alex on macOS. Leave blank for the system default.")
         .addText((t) =>
           t
-            .setPlaceholder("sk_...")
-            .setValue(this.plugin.settings.elevenlabsApiKey)
+            .setPlaceholder("Samantha")
+            .setValue(s.voiceBrowser)
             .onChange(async (v) => {
-              this.plugin.settings.elevenlabsApiKey = v;
-              await this.plugin.saveSettings();
-            }),
-        );
-      new Setting(containerEl)
-        .setName("ElevenLabs model")
-        .addDropdown((dd) =>
-          dd
-            .addOption("eleven_turbo_v2_5", "Turbo v2.5 (fast, cheap)")
-            .addOption("eleven_multilingual_v2", "Multilingual v2 (best quality)")
-            .setValue(this.plugin.settings.elevenlabsModel)
-            .onChange(async (v) => {
-              this.plugin.settings.elevenlabsModel = v;
+              s.voiceBrowser = v;
               await this.plugin.saveSettings();
             }),
         );
     }
 
-    if (this.plugin.settings.engine === "piper") {
+    if (s.engine === "openai") {
+      section(containerEl, "OpenAI");
       new Setting(containerEl)
-        .setName("Piper server URL")
-        .setDesc(
-          "Rhapsode talks to a local Piper HTTP server. One-time setup: `pip install piper-tts[http]`, then in any terminal run `python3 -m piper.download_voices en_US-lessac-medium` and `python3 -m piper.http_server -m en_US-lessac-medium`. Leave that terminal running. Default URL works if you started the server on the default port.",
-        )
-        .addText((t) =>
-          t
-            .setPlaceholder("http://localhost:5000")
-            .setValue(this.plugin.settings.piperServerUrl)
-            .onChange(async (v) => {
-              this.plugin.settings.piperServerUrl = v;
-              await this.plugin.saveSettings();
-            }),
-        );
-    }
-
-    if (this.plugin.settings.engine === "openai") {
-      new Setting(containerEl)
-        .setName("OpenAI API key")
-        .setDesc("From platform.openai.com → API keys.")
+        .setName("API key")
+        .setDesc("Your OpenAI secret key. Find it at platform.openai.com.")
         .addText((t) =>
           t
             .setPlaceholder("sk-...")
-            .setValue(this.plugin.settings.openaiApiKey)
+            .setValue(s.openaiApiKey)
             .onChange(async (v) => {
-              this.plugin.settings.openaiApiKey = v;
+              s.openaiApiKey = v;
               await this.plugin.saveSettings();
             }),
         );
       new Setting(containerEl)
-        .setName("OpenAI TTS model")
+        .setName("Model")
+        .setDesc("tts-1 is faster, tts-1-hd sounds better.")
         .addDropdown((dd) =>
           dd
-            .addOption("tts-1", "tts-1 (fast, cheap)")
-            .addOption("tts-1-hd", "tts-1-hd (better quality)")
-            .setValue(this.plugin.settings.openaiModel)
+            .addOption("tts-1", "tts-1")
+            .addOption("tts-1-hd", "tts-1-hd")
+            .setValue(s.openaiModel)
             .onChange(async (v) => {
-              this.plugin.settings.openaiModel = v as "tts-1" | "tts-1-hd";
+              s.openaiModel = v as "tts-1" | "tts-1-hd";
               await this.plugin.saveSettings();
             }),
+        );
+      new Setting(containerEl)
+        .setName("Voice")
+        .setDesc("The character of the voice.")
+        .addDropdown((dd) => {
+          for (const v of ["alloy","ash","ballad","cedar","coral","echo","fable","marin","nova","onyx","sage","shimmer","verse"]) {
+            dd.addOption(v, v);
+          }
+          return dd
+            .setValue(s.voiceOpenai)
+            .onChange(async (v) => {
+              s.voiceOpenai = v;
+              await this.plugin.saveSettings();
+            });
+        });
+      new Setting(containerEl)
+        .setName("Tone")
+        .setDesc("How the voice delivers the text.")
+        .addDropdown((dd) => {
+          const tones: Record<string, string> = {
+            "": "(none)",
+            "Speak in a calm and warm tone.": "Calm and warm",
+            "Speak in a natural, conversational tone.": "Conversational",
+            "Speak like a professional news anchor.": "News anchor",
+            "Speak in a storytelling tone, with natural pacing and expression.": "Storytelling",
+            "Speak in an energetic and upbeat tone.": "Energetic",
+          };
+          for (const [val, label] of Object.entries(tones)) {
+            dd.addOption(val, label);
+          }
+          return dd
+            .setValue(s.openaiInstructions)
+            .onChange(async (v) => {
+              s.openaiInstructions = v;
+              await this.plugin.saveSettings();
+            });
+        });
+    }
+
+    if (s.engine === "elevenlabs") {
+      section(containerEl, "ElevenLabs");
+      new Setting(containerEl)
+        .setName("API key")
+        .setDesc("Your ElevenLabs API key. Find it in your profile settings.")
+        .addText((t) =>
+          t
+            .setPlaceholder("xi-api-key / sk_...")
+            .setValue(s.elevenlabsApiKey)
+            .onChange(async (v) => {
+              s.elevenlabsApiKey = v;
+              await this.plugin.saveSettings();
+            }),
+        );
+      new Setting(containerEl)
+        .setName("Model")
+        .setDesc("Turbo v2.5 is faster. Multilingual v2 supports more languages.")
+        .addDropdown((dd) =>
+          dd
+            .addOption("eleven_turbo_v2_5", "Turbo v2.5")
+            .addOption("eleven_multilingual_v2", "Multilingual v2")
+            .setValue(s.elevenlabsModel)
+            .onChange(async (v) => {
+              s.elevenlabsModel = v;
+              await this.plugin.saveSettings();
+            }),
+        );
+      // Add voice row
+      section(containerEl, "Voices");
+      let newVoiceName = "";
+      let newVoiceId = "";
+      const addVoiceSetting = new Setting(containerEl)
+        .setName("Add voice")
+        .setDesc("Name + ElevenLabs voice ID.")
+        .addText((t) =>
+          t.setPlaceholder("Name").onChange((v) => (newVoiceName = v)),
+        )
+        .addText((t) =>
+          t.setPlaceholder("Voice ID").onChange((v) => (newVoiceId = v)),
+        )
+        .addButton((b) =>
+          b.setButtonText("Add").onClick(async () => {
+            if (!newVoiceName.trim() || !newVoiceId.trim()) return;
+            s.elevenlabsVoices.push({ name: newVoiceName.trim(), id: newVoiceId.trim() });
+            if (!s.voiceElevenlabs) s.voiceElevenlabs = newVoiceId.trim();
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+        );
+
+      // Added voices as tags — click to set as default, × to remove
+      if (s.elevenlabsVoices.length > 0) {
+        const tags = addVoiceSetting.settingEl.createEl("div", { cls: "vox-voice-tags" });
+        for (const voice of s.elevenlabsVoices) {
+          const isDefault = s.voiceElevenlabs === voice.id;
+          const chip = tags.createEl("span", {
+            cls: "vox-voice-chip" + (isDefault ? " vox-voice-chip--active" : ""),
+            title: isDefault ? "Default" : "Click to set as default",
+          });
+          chip.createEl("span", { text: voice.name, cls: "vox-voice-chip-name" });
+          chip.addEventListener("click", async (e) => {
+            if ((e.target as HTMLElement).closest(".vox-voice-chip-remove")) return;
+            s.voiceElevenlabs = voice.id;
+            await this.plugin.saveSettings();
+            this.display();
+          });
+          const x = chip.createEl("span", { cls: "vox-voice-chip-remove", text: "×" });
+          x.addEventListener("click", async () => {
+            s.elevenlabsVoices = s.elevenlabsVoices.filter((v) => v.id !== voice.id);
+            if (s.voiceElevenlabs === voice.id) s.voiceElevenlabs = s.elevenlabsVoices[0]?.id ?? "";
+            await this.plugin.saveSettings();
+            this.display();
+          });
+        }
+      }
+    }
+
+    // ── Cache ────────────────────────────────────────────────────
+    if (s.engine === "openai" || s.engine === "elevenlabs") {
+      new Setting(containerEl)
+        .setName("Cache audio")
+        .setDesc("Save generated audio so unchanged notes are not re-billed. Coming soon.")
+        .addToggle((tg) =>
+          tg.setValue(s.cacheEnabled).onChange(async (v) => {
+            s.cacheEnabled = v;
+            await this.plugin.saveSettings();
+          }),
         );
     }
 
-    // ── Caching ───────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName("Cache generated audio")
-      .setDesc(
-        "Saves generated audio to .obsidian/plugins/rhapsode/cache/ keyed by note content hash. Prevents re-billing cloud TTS when the note hasn't changed.",
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.cacheEnabled).onChange(async (v) => {
-          this.plugin.settings.cacheEnabled = v;
-          await this.plugin.saveSettings();
-        }),
-      );
+    // ── Folder personas ──────────────────────────────────────────
+    section(containerEl, "Folder voices");
 
-    // ── Persona voices per folder ─────────────────────────────────
-    containerEl.createEl("h3", { text: "Persona voices per folder" });
-    containerEl.createEl("p", {
-      text: "Assign a different voice to each folder prefix. The longest matching prefix wins. You can also set a `voice:` key in a note's frontmatter to override per-note.",
-      cls: "setting-item-description",
-    });
+    const folderVoices = s.folderVoicesByEngine[s.engine];
+    const elevenlabsVoiceOptions = s.engine === "elevenlabs" && s.elevenlabsVoices.length > 0
+      ? s.elevenlabsVoices
+      : null;
 
-    const folderVoices = this.plugin.settings.folderVoices;
     for (const prefix of Object.keys(folderVoices)) {
-      new Setting(containerEl)
-        .setName(prefix)
-        .addText((t) =>
+      const setting = new Setting(containerEl).setName(prefix);
+      if (elevenlabsVoiceOptions) {
+        setting.addDropdown((dd) => {
+          for (const v of elevenlabsVoiceOptions) dd.addOption(v.id, v.name);
+          return dd.setValue(folderVoices[prefix]).onChange(async (v) => {
+            folderVoices[prefix] = v;
+            await this.plugin.saveSettings();
+          });
+        });
+      } else {
+        setting.addText((t) =>
           t.setValue(folderVoices[prefix]).onChange(async (v) => {
             folderVoices[prefix] = v;
             await this.plugin.saveSettings();
           }),
-        )
-        .addExtraButton((b) =>
-          b
-            .setIcon("trash")
-            .setTooltip("Remove")
-            .onClick(async () => {
-              delete folderVoices[prefix];
-              await this.plugin.saveSettings();
-              this.display();
-            }),
         );
-    }
-
-    let newPrefix = "";
-    let newVoice = "";
-    new Setting(containerEl)
-      .setName("Add folder mapping")
-      .addText((t) => t.setPlaceholder("Philosophy/").onChange((v) => (newPrefix = v)))
-      .addText((t) => t.setPlaceholder("voice-id").onChange((v) => (newVoice = v)))
-      .addButton((b) =>
-        b.setButtonText("Add").onClick(async () => {
-          if (!newPrefix || !newVoice) return;
-          folderVoices[newPrefix] = newVoice;
+      }
+      setting.addExtraButton((b) =>
+        b.setIcon("trash").setTooltip("Remove").onClick(async () => {
+          delete folderVoices[prefix];
           await this.plugin.saveSettings();
           this.display();
         }),
       );
-  }
-
-  private voiceHintForEngine(engine: TtsEngine): string {
-    switch (engine) {
-      case "browser":
-        return "System voice name, e.g. 'Samantha', 'Alex', 'Daniel'. Leave blank for the system default.";
-      case "elevenlabs":
-        return "ElevenLabs voice_id (22-char string from your ElevenLabs voice library).";
-      case "openai":
-        return "One of: alloy, echo, fable, onyx, nova, shimmer.";
-      case "piper":
-        return "Voice name (e.g. en_US-lessac-medium). Leave blank to use whatever voice the Piper server was launched with.";
     }
-  }
 
-  private voicePlaceholder(engine: TtsEngine): string {
-    switch (engine) {
-      case "browser":
-        return "Samantha";
-      case "elevenlabs":
-        return "21m00Tcm4TlvDq8ikWAM";
-      case "openai":
-        return "alloy";
-      case "piper":
-        return "en_US-lessac-medium";
+    let newPrefix = "";
+    let newVoice = elevenlabsVoiceOptions?.[0]?.id ?? "";
+    const addFolderSetting = new Setting(containerEl)
+      .setName("Add folder mapping")
+      .addText((t) => t.setPlaceholder("Philosophy/").onChange((v) => (newPrefix = v)));
+    if (elevenlabsVoiceOptions) {
+      addFolderSetting.addDropdown((dd) => {
+        for (const v of elevenlabsVoiceOptions) dd.addOption(v.id, v.name);
+        return dd.setValue(newVoice).onChange((v) => (newVoice = v));
+      });
+    } else {
+      addFolderSetting.addText((t) => t.setPlaceholder("voice id").onChange((v) => (newVoice = v)));
     }
+    addFolderSetting.addButton((b) =>
+      b.setButtonText("Add").onClick(async () => {
+        if (!newPrefix || !newVoice) return;
+        folderVoices[newPrefix] = newVoice;
+        await this.plugin.saveSettings();
+        this.display();
+      }),
+    );
   }
 }

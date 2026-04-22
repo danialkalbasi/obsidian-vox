@@ -1,5 +1,5 @@
 import { requestUrl, type Plugin } from "obsidian";
-import type { RhapsodeSettings } from "../settings";
+import type { VoxSettings } from "../settings";
 import type { UrlBackend } from "./backend";
 
 /**
@@ -17,15 +17,15 @@ import type { UrlBackend } from "./backend";
  */
 export class OpenAIBackend implements UrlBackend {
   readonly kind = "url" as const;
-  private settings: RhapsodeSettings;
+  private settings: VoxSettings;
 
-  constructor(settings: RhapsodeSettings, _plugin: Plugin) {
+  constructor(settings: VoxSettings, _plugin: Plugin) {
     this.settings = settings;
   }
 
-  async synthesizeToUrl(sentence: string, voice: string): Promise<string> {
+  async synthesizeToUrl(sentence: string, voice: string, rate = 1.0): Promise<string> {
     if (!this.settings.openaiApiKey) {
-      throw new Error("OpenAI API key not set — add one in Rhapsode settings.");
+      throw new Error("OpenAI API key not set — add one in Vox settings.");
     }
 
     const res = await requestUrl({
@@ -40,6 +40,10 @@ export class OpenAIBackend implements UrlBackend {
         voice: voice || "alloy",
         input: sentence,
         format: "mp3",
+        speed: rate,
+        ...(this.settings.openaiInstructions?.trim()
+          ? { instructions: this.settings.openaiInstructions.trim() }
+          : {}),
       }),
       throw: false,
     });

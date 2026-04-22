@@ -21,8 +21,9 @@ export class Player {
   private queue: string[] = [];
   private cursor = 0;
   private audio: HTMLAudioElement | null = null;
-  private cancelled = false;
   private rate = 1.0;
+  private tokenCounter = 0;
+  private activeToken = 0;
 
   private state: PlayerState = "idle";
   private listeners: Set<PlayerStateListener> = new Set();
@@ -37,7 +38,6 @@ export class Player {
 
   setRate(rate: number) {
     this.rate = rate;
-    if (this.audio) this.audio.playbackRate = rate;
   }
 
   getState(): PlayerState {
@@ -60,60 +60,63 @@ export class Player {
     for (const l of this.listeners) l(next);
   }
 
+  private isActive(token: number): boolean {
+    return token !== 0 && token === this.activeToken;
+  }
+
   /**
    * Start playing the given text with the given voice. Stops any
    * currently-playing audio first.
    */
   async play(text: string, voice: string): Promise<void> {
     this.stop();
-    this.cancelled = false;
+    const token = ++this.tokenCounter;
+    this.activeToken = token;
 
     this.queue = splitIntoSentences(text);
     this.cursor = 0;
     if (this.queue.length === 0) return;
 
-    this.setState("playing");
-
     if (this.backend.kind === "synth") {
+      this.setState("playing");
       // Browser SpeechSynthesis queues utterances internally. We hook
       // the last one's `onend` to transition back to `idle` on natural
       // completion; the backend will emit that callback for us.
       await this.backend.speakAll(this.queue, voice, this.rate, () => {
-        if (!this.cancelled) this.setState("idle");
+        if (this.isActive(token)) this.setState("idle");
       });
       return;
     }
 
     this.audio = new Audio();
-    this.audio.playbackRate = this.rate;
     // Keep state in sync with underlying element events: pausing the
     // <audio> outside our API (e.g. OS media-key interception) still
     // updates our state cleanly.
     this.audio.onpause = () => {
-      if (!this.cancelled && this.audio && !this.audio.ended) {
+      if (this.isActive(token) && this.audio && !this.audio.ended) {
         this.setState("paused");
       }
     };
     this.audio.onplay = () => {
-      if (!this.cancelled) this.setState("playing");
+      if (this.isActive(token)) this.setState("playing");
     };
-    await this.playNext(voice);
+    await this.playNext(token, voice);
   }
 
-  private async playNext(voice: string): Promise<void> {
-    if (this.cancelled) return;
+  private async playNext(token: number, voice: string): Promise<void> {
+    if (!this.isActive(token)) return;
     if (this.cursor >= this.queue.length) {
       // Natural end of queue — only fires for URL backends. Synth
       // backend signals completion via the callback passed to speakAll.
       this.audio = null;
-      this.setState("idle");
+      if (this.isActive(token)) this.setState("idle");
       return;
     }
     if (!this.audio || this.backend.kind !== "url") return;
 
     const sentence = this.queue[this.cursor++];
-    const url = await this.backend.synthesizeToUrl(sentence, voice);
-    if (this.cancelled) {
+    const url = await this.backend.synthesizeToUrl(sentence, voice, this.rate);
+    if (!this.isActive(token)) {
       URL.revokeObjectURL(url);
       return;
     }
@@ -122,13 +125,15 @@ export class Player {
 
     this.audio.onended = () => {
       URL.revokeObjectURL(url);
-      this.playNext(voice).catch((err) => {
-        console.error("Rhapsode: playback error", err);
+      if (!this.isActive(token)) return;
+      this.playNext(token, voice).catch((err) => {
+        console.error("Vox: playback error", err);
         this.setState("idle");
       });
     };
 
     await this.audio.play();
+    if (this.isActive(token)) this.setState("playing");
   }
 
   pause() {
@@ -152,8 +157,11 @@ export class Player {
 
   stop() {
     if (this.state === "idle" && !this.audio && this.queue.length === 0) return;
-    this.cancelled = true;
+    this.activeToken = ++this.tokenCounter;
     if (this.audio) {
+      this.audio.onpause = null;
+      this.audio.onplay = null;
+      this.audio.onended = null;
       this.audio.pause();
       this.audio.src = "";
       this.audio = null;

@@ -3,7 +3,7 @@ import process from "process";
 import builtins from "builtin-modules";
 
 const banner = `/*
-Rhapsode — reads your notes aloud.
+Vox — reads your notes aloud.
 Bundled by esbuild; do not edit main.js directly.
 */`;
 

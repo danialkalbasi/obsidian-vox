@@ -1,9 +1,8 @@
 import type { Plugin } from "obsidian";
-import type { RhapsodeSettings } from "../settings";
+import type { VoxSettings } from "../settings";
 import { BrowserSynthBackend } from "./browser";
 import { OpenAIBackend } from "./openai";
 import { ElevenLabsBackend } from "./elevenlabs";
-import { PiperBackend } from "./piper";
 
 /**
  * TTS backend discriminated union.
@@ -45,17 +44,17 @@ export interface UrlBackend {
    * to a playable audio blob (MP3/OGG/WAV). The Player is responsible
    * for revoking it after playback ends.
    */
-  synthesizeToUrl(sentence: string, voice: string): Promise<string>;
+  synthesizeToUrl(sentence: string, voice: string, rate: number): Promise<string>;
 }
 
 /**
  * Factory: pick the concrete backend based on user settings. Called
- * from `RhapsodePlugin.onload` and again from `saveSettings` so the
+ * from `VoxPlugin.onload` and again from `saveSettings` so the
  * live Player always has a fresh backend that reflects the latest
  * API keys / engine choice without a full plugin reload.
  */
 export function createBackend(
-  settings: RhapsodeSettings,
+  settings: VoxSettings,
   plugin: Plugin,
 ): TtsBackend {
   switch (settings.engine) {
@@ -65,7 +64,5 @@ export function createBackend(
       return new OpenAIBackend(settings, plugin);
     case "elevenlabs":
       return new ElevenLabsBackend(settings, plugin);
-    case "piper":
-      return new PiperBackend(settings, plugin);
   }
 }

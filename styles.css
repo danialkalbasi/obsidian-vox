@@ -1,4 +1,8 @@
-.rhapsode-status {
+.vox-ribbon .svg-icon {
+  transform: scale(1.2);
+}
+
+.vox-status {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -6,20 +10,111 @@
   color: var(--text-accent);
 }
 
-.rhapsode-status:hover {
+.vox-status:hover {
   color: var(--text-accent-hover);
 }
 
-.rhapsode-status-icon {
+.vox-status-icon {
   display: inline-flex;
   align-items: center;
 }
 
-.rhapsode-status-icon svg {
+.vox-status-icon svg {
   width: 12px;
   height: 12px;
 }
 
-.rhapsode-status-text {
+.vox-status-text {
   font-size: var(--status-bar-font-size);
+}
+
+.vox-voice-picker {
+  position: fixed;
+  z-index: 9999;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 4px;
+  min-width: 140px;
+}
+
+.vox-voice-picker-item {
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  color: var(--text-normal);
+}
+
+.vox-voice-picker-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.vox-voice-picker-item--active {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.vox-voice-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 10px;
+}
+
+.setting-item:has(.vox-voice-tags) {
+  flex-wrap: wrap;
+}
+
+.vox-voice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: none;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  user-select: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+
+.vox-voice-chip:hover {
+  background: var(--background-modifier-active-hover);
+  color: var(--text-normal);
+}
+
+.vox-voice-chip--active {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.15);
+  color: var(--color-accent);
+}
+
+.vox-voice-chip--active:hover {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.25);
+  color: var(--color-accent);
+}
+
+.vox-voice-chip-name {
+  line-height: 1;
+}
+
+
+.vox-voice-chip-remove {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.6;
+  color: inherit;
+}
+
+.vox-voice-chip-remove:hover {
+  opacity: 1;
 }

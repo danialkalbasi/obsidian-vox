@@ -1,6 +1,32 @@
-node_modules/
+# Build output
 main.js
-*.log
-.DS_Store
+main.js.map
+*.js.map
+
+# Dependencies
+node_modules/
+
+# Obsidian plugin data
 data.json
 cache/
+
+# Environment / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo

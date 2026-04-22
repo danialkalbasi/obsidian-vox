@@ -1,5 +1,5 @@
 import { requestUrl, type Plugin } from "obsidian";
-import type { RhapsodeSettings } from "../settings";
+import type { VoxSettings } from "../settings";
 import type { UrlBackend } from "./backend";
 
 /**
@@ -18,16 +18,16 @@ import type { UrlBackend } from "./backend";
  */
 export class ElevenLabsBackend implements UrlBackend {
   readonly kind = "url" as const;
-  private settings: RhapsodeSettings;
+  private settings: VoxSettings;
 
-  constructor(settings: RhapsodeSettings, _plugin: Plugin) {
+  constructor(settings: VoxSettings, _plugin: Plugin) {
     this.settings = settings;
   }
 
-  async synthesizeToUrl(sentence: string, voice: string): Promise<string> {
+  async synthesizeToUrl(sentence: string, voice: string, rate = 1.0): Promise<string> {
     if (!this.settings.elevenlabsApiKey) {
       throw new Error(
-        "ElevenLabs API key not set — add one in Rhapsode settings.",
+        "ElevenLabs API key not set — add one in Vox settings.",
       );
     }
     if (!voice) {
@@ -51,6 +51,7 @@ export class ElevenLabsBackend implements UrlBackend {
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
+          speed: Math.min(1.2, Math.max(0.7, rate)),
         },
       }),
       throw: false,
