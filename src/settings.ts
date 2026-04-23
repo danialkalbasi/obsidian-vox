@@ -35,8 +35,8 @@ export interface VoxSettings {
 }
 
 export const DEFAULT_SETTINGS: VoxSettings = {
-  engine: "browser",
-  rate: 1.0,
+  engine: "elevenlabs",
+  rate: 0.85,
   voiceBrowser: "",
   voiceOpenai: "alloy",
   voiceElevenlabs: "",
