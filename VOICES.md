@@ -11,12 +11,6 @@ Paste these into the voice generation prompt field to create a voice that fits y
 
 ---
 
-## Nassim Taleb
-
-> A deep, accented male voice — Lebanese, educated in France and the US. Unhurried and self-assured, as if the idea is already settled in his mind and he is simply letting you catch up. Slightly gravelly. Speaks in bursts — a long pause, then a dense sentence. Amused rather than angry. The tone of someone who has stopped trying to convince people and is now just stating things.
-
----
-
 ## Tony Robbins
 
 > A deep, powerful male voice with tremendous presence. Speaks with conviction and urgency, building energy through each sentence. Warm but commanding — like someone who genuinely believes what they are saying and wants you to feel it too. Full chest, no hesitation.

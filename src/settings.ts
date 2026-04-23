@@ -78,7 +78,7 @@ export class VoxSettingTab extends PluginSettingTab {
     containerEl.createEl("h2", { text: "Vox" });
 
     new Setting(containerEl)
-      .setName("Engine")
+      .setName("Provider")
       .setDesc("Which service reads your notes aloud.")
       .addDropdown((dd) =>
         dd

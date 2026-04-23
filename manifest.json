@@ -3,7 +3,7 @@
   "name": "Vox",
   "version": "0.1.0",
   "minAppVersion": "1.4.0",
-  "description": "Reads your notes aloud with neural text-to-speech. Supports per-folder persona voices, local Piper TTS, and streaming cloud voices (ElevenLabs, OpenAI).",
+  "description": "Reads your notes aloud with neural text-to-speech. ElevenLabs, OpenAI, or your browser's built-in voice. Different folders, different voices.",
   "author": "danialkalbasi",
   "authorUrl": "",
   "isDesktopOnly": false

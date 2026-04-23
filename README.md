@@ -1,54 +1,145 @@
-# Vox
+```
+    ╭────────────────────╮
+    │        vox         │
+    │  ────────────────  │
+    │                    │
+    │ ░░░ ░░░░░ ░░░ ░░   │
+    │ ░░░░ ░░░ ░░░░░     │
+    │                    │
+   ▶│ ████ █████ ██ ████ │── ·)) ·))) ·))))
+    │                    │
+    │ ▬▬▬ ▬▬▬▬▬ ▬▬▬▬     │
+    │ ▬▬▬▬ ▬▬▬ ▬▬ ▬▬▬    │
+    │                    │
+    ╰────────────────────╯
+```
 
-Vox reads your Obsidian notes aloud with neural text-to-speech. Different folders can have different voices, so your philosophy notes can sound different from your journal.
+**Vox** reads your Obsidian notes aloud with neural text-to-speech.
 
-## Features
+Different folders can have different voices. Pick a voice on the fly by hovering the sidebar icon. No interruptions, no fuss.
 
-- **Ribbon button**: morphs between speaker / pause / play while audio is active; a separate stop button appears during playback
-- **Hover voice picker**: hover the ribbon icon to pick a voice on the fly without touching settings
-- **Status bar indicator**: clickable pill shows "Reading" / "Paused"; hidden when idle
-- **Command palette**: Read active note / Stop / Toggle play-pause
-- **File menu**: right-click any note -> Vox: read aloud
-- **Three TTS backends**: Browser (free, offline), OpenAI, ElevenLabs
-- **Per-engine speed control**: each backend has its own range
-- **Per-folder persona voices**: longest prefix wins; stored per-engine
-- **Per-note voice override** via frontmatter `voice: <id>`
-- **Tone control** (OpenAI): preset delivery styles (calm, conversational, storytelling, ...)
-- **Voice library** (ElevenLabs): save name + ID pairs as clickable chips; click to set default, x to remove
+Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to start), **Browser** (free, no account needed).
 
-## Backends
+---
 
-| Engine | Quality | Cost | Requires |
-|---|---|---|---|
-| Browser | System voices | Free | Nothing |
-| OpenAI | High | ~$0.015 / 1k chars | API key |
-| ElevenLabs | Premium | Per-character plan | API key + voice IDs |
+## What I use it for
 
-### OpenAI voices
-alloy · ash · ballad · cedar · coral · echo · fable · marin · nova · onyx · sage · shimmer · verse
+- Hearing book notes in the author's voice
+- Reviewing meeting notes or decisions hands-free
+- Catching awkward phrasing in your own writing by hearing it read back
+- Going through a long research note without staring at a screen
+- Assigning a distinct voice to each folder so context shifts feel intentional
 
-### ElevenLabs models
-- **Turbo v2.5**: low latency, English-first
-- **Multilingual v2**: broader language support
+---
 
-## Configuration
+## Setup
 
-**Settings -> Vox:**
+1. Go to **Settings → Community plugins**, click **Open plugins folder**, and drop the plugin folder in (`.obsidian/plugins/vox/`)
+2. Enable it under **Settings → Community plugins**
+3. Open **Settings → Vox** and pick your provider
 
-- **Engine**: browser / openai / elevenlabs
-- **Speed**: slider (range varies by engine)
-- **Voice / API key**: shown only for the active engine
-- **Tone** (OpenAI): delivery style preset
-- **Voices** (ElevenLabs): add name + voice ID pairs
-- **Folder voices**: map a folder prefix to a voice id for the active engine
+---
 
-Per-note override via YAML frontmatter:
+## ElevenLabs
+
+The best option if you read a lot. Premium voice quality, worth the cost.
+
+### Get your API key
+
+1. Create an account at [elevenlabs.io](https://elevenlabs.io)
+2. Profile → API keys → copy your key
+3. Paste it into **Settings → Vox → API key**
+
+### Create a voice
+
+ElevenLabs Voice Design lets you generate a voice from a description. Paste a prompt into the Description field, generate, and you'll have something worth listening to.
+
+There's a ready-made collection of voice prompts in [`VOICES.md`](./VOICES.md): Epictetus, Tony Robbins, David Attenborough. Each one is tuned to a specific character. Start there.
+
+A few tips:
+
+- Stability 0.5, similarity boost 0.75 is a good starting point
+- Try the same prompt with different base voices. The description shapes personality, the base voice shapes timbre.
+
+### Add the voice to Vox
+
+Once you've created a voice:
+
+1. In ElevenLabs, open the voice → copy the Voice ID
+2. In Vox settings → **Voices → Add voice**
+3. Give it a name (anything you'll recognise) and paste the Voice ID
+4. Click the chip to set it as default
+
+Speed range: 0.7x - 1.2x. ElevenLabs applies it server-side, so quality stays clean.
+
+---
+
+## OpenAI
+
+Easier to set up. High quality, more neutral character.
+
+1. Get an API key from [platform.openai.com](https://platform.openai.com)
+2. Paste it into **Settings → Vox → API key**
+3. Pick a voice: `alloy · ash · ballad · cedar · coral · echo · fable · marin · nova · onyx · sage · shimmer · verse`
+4. Set a **Tone** if you want (calm, conversational, news anchor, storytelling, energetic)
+
+**Models:** `tts-1` is faster and cheaper. `tts-1-hd` sounds noticeably better for long reads. Cost is around $0.015 per 1k characters.
+
+Speed range: 0.25x - 4.0x.
+
+---
+
+## Browser (free)
+
+No account, no API key. Uses your OS's built-in speech synthesis.
+
+1. Switch the provider to **Browser** in Vox settings
+2. Optionally set a voice name (`Samantha` or `Alex` on macOS). Leave blank for the system default.
+
+Quality depends entirely on your operating system. Fine for short reads, not great for anything longer.
+
+Speed range: 0.6x - 2.0x.
+
+---
+
+## Usage
+
+**Sidebar icon** morphs based on state:
+
+- idle: click to start reading
+- playing: click to pause
+- paused: click to resume
+- a stop icon appears alongside while active, click to stop entirely
+
+**Hover the icon** (when idle) and a voice picker opens to the right. Pick a voice and it starts reading immediately.
+
+**Status bar** shows `Reading` or `Paused` while active. Click to toggle. Hidden when idle.
+
+**Command palette:**
+
+- `Vox: Read active note aloud`
+- `Vox: Stop reading`
+- `Vox: Toggle play / pause`
+
+**File menu:** right-click any `.md` file → `Vox: read aloud`
+
+### Per-folder voices
+
+Go to **Folder voices** in settings. Map a folder prefix to a voice. The longest matching prefix wins, so `Philosophy/Stoics/` beats `Philosophy/` if both match.
+
+### Per-note override
+
+Override the voice for a single note via frontmatter:
 
 ```yaml
 ---
 voice: "nova"
 ---
 ```
+
+Works with any provider. For ElevenLabs, use the voice ID. For OpenAI, use the voice name.
+
+---
 
 ## Development
 
@@ -57,22 +148,9 @@ npm install
 npm run dev
 ```
 
-The plugin should live inside your vault at `.obsidian/plugins/vox/`. Enable it under **Settings -> Community plugins**.
-
-Build for release:
+The plugin lives at `.obsidian/plugins/vox/` inside your vault. Enable it under **Settings → Community plugins** after building.
 
 ```bash
-npm run build
+npm run build      # production build
+npm run typecheck  # type-check without building
 ```
-
-Type-check only:
-
-```bash
-npm run typecheck
-```
-
-## Roadmap
-
-- **Audio caching**: hash-keyed cache so unchanged notes don't re-bill cloud APIs
-- **Highlight as reads**: colour the current sentence during playback
-- **Section-level playback**: click a paragraph to start reading from there
