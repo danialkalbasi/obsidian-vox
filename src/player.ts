@@ -21,6 +21,7 @@ export class Player {
   private queue: string[] = [];
   private cursor = 0;
   private audio: HTMLAudioElement | null = null;
+  private currentAudioUrl: string | null = null;
   private rate = 1.0;
   private tokenCounter = 0;
   private activeToken = 0;
@@ -62,6 +63,12 @@ export class Player {
 
   private isActive(token: number): boolean {
     return token !== 0 && token === this.activeToken;
+  }
+
+  private releaseCurrentAudioUrl() {
+    if (!this.currentAudioUrl) return;
+    URL.revokeObjectURL(this.currentAudioUrl);
+    this.currentAudioUrl = null;
   }
 
   /**
@@ -108,6 +115,7 @@ export class Player {
     if (this.cursor >= this.queue.length) {
       // Natural end of queue — only fires for URL backends. Synth
       // backend signals completion via the callback passed to speakAll.
+      this.releaseCurrentAudioUrl();
       this.audio = null;
       if (this.isActive(token)) this.setState("idle");
       return;
@@ -121,10 +129,12 @@ export class Player {
       return;
     }
 
+    this.releaseCurrentAudioUrl();
+    this.currentAudioUrl = url;
     this.audio.src = url;
 
     this.audio.onended = () => {
-      URL.revokeObjectURL(url);
+      this.releaseCurrentAudioUrl();
       if (!this.isActive(token)) return;
       this.playNext(token, voice).catch((err) => {
         console.error("Vox: playback error", err);
@@ -132,7 +142,12 @@ export class Player {
       });
     };
 
-    await this.audio.play();
+    try {
+      await this.audio.play();
+    } catch (err) {
+      this.releaseCurrentAudioUrl();
+      throw err;
+    }
     if (this.isActive(token)) this.setState("playing");
   }
 
@@ -166,6 +181,7 @@ export class Player {
       this.audio.src = "";
       this.audio = null;
     }
+    this.releaseCurrentAudioUrl();
     if (this.backend.kind === "synth") this.backend.stopAll();
     this.queue = [];
     this.cursor = 0;
