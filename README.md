@@ -1,26 +1,10 @@
-```
-    ╭────────────────────╮
-    │        vox         │
-    │  ────────────────  │
-    │                    │
-    │ ░░░ ░░░░░ ░░░ ░░   │
-    │ ░░░░ ░░░ ░░░░░     │
-    │                    │
-   ▶│ ████ █████ ██ ████ │── ·)) ·))) ·))))
-    │                    │
-    │ ▬▬▬ ▬▬▬▬▬ ▬▬▬▬     │
-    │ ▬▬▬▬ ▬▬▬ ▬▬ ▬▬▬    │
-    │                    │
-    ╰────────────────────╯
-```
+![Vox banner](assets/readme-banner.png)
 
 **Vox** reads your Obsidian notes aloud with neural text-to-speech.
 
 Different folders can have different voices. Pick a voice on the fly by hovering the sidebar icon. No interruptions, no fuss.
 
 Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to start), **Browser** (free, no account needed).
-
----
 
 ## What I use it for
 
@@ -30,15 +14,11 @@ Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to sta
 - Going through a long research note without staring at a screen
 - Assigning a distinct voice to each folder so context shifts feel intentional
 
----
-
 ## Setup
 
 1. Go to **Settings → Community plugins**, click **Open plugins folder**, and drop the plugin folder in (`.obsidian/plugins/vox/`)
 2. Enable it under **Settings → Community plugins**
 3. Open **Settings → Vox** and pick your provider
-
----
 
 ## ElevenLabs
 
@@ -72,8 +52,6 @@ Once you've created a voice:
 
 Speed range: 0.7x - 1.2x. ElevenLabs applies it server-side, so quality stays clean.
 
----
-
 ## OpenAI
 
 Easier to set up. High quality, more neutral character.
@@ -87,8 +65,6 @@ Easier to set up. High quality, more neutral character.
 
 Speed range: 0.25x - 4.0x.
 
----
-
 ## Browser (free)
 
 No account, no API key. Uses your OS's built-in speech synthesis.
@@ -99,8 +75,6 @@ No account, no API key. Uses your OS's built-in speech synthesis.
 Quality depends entirely on your operating system. Fine for short reads, not great for anything longer.
 
 Speed range: 0.6x - 2.0x.
-
----
 
 ## Usage
 
@@ -132,14 +106,10 @@ Go to **Folder voices** in settings. Map a folder prefix to a voice. The longest
 Override the voice for a single note via frontmatter:
 
 ```yaml
----
 voice: "nova"
----
 ```
 
 Works with any provider. For ElevenLabs, use the voice ID. For OpenAI, use the voice name.
-
----
 
 ## Development
 
