@@ -1,5 +1,6 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type VoxPlugin from "./main";
+import { AudioCache } from "./tts/cache";
 
 export type TtsEngine = "browser" | "elevenlabs" | "openai";
 
@@ -287,11 +288,17 @@ export class VoxSettingTab extends PluginSettingTab {
     if (s.engine === "openai" || s.engine === "elevenlabs") {
       new Setting(containerEl)
         .setName("Cache audio")
-        .setDesc("Save generated audio so unchanged notes are not re-billed. Coming soon.")
+        .setDesc("Reuse generated audio for identical text, voice, model, tone, and speed.")
         .addToggle((tg) =>
           tg.setValue(s.cacheEnabled).onChange(async (v) => {
             s.cacheEnabled = v;
             await this.plugin.saveSettings();
+          }),
+        )
+        .addButton((button) =>
+          button.setButtonText("Clear").onClick(async () => {
+            await new AudioCache(this.plugin).clear();
+            new Notice("Vox: audio cache cleared.");
           }),
         );
     }

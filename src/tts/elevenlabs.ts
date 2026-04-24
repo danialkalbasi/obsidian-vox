@@ -1,6 +1,7 @@
 import { requestUrl, type Plugin } from "obsidian";
 import type { VoxSettings } from "../settings";
 import type { UrlBackend } from "./backend";
+import { AudioCache, type AudioCacheParts } from "./cache";
 
 /**
  * ElevenLabs TTS backend (`/v1/text-to-speech/{voice_id}`).
@@ -19,9 +20,11 @@ import type { UrlBackend } from "./backend";
 export class ElevenLabsBackend implements UrlBackend {
   readonly kind = "url" as const;
   private settings: VoxSettings;
+  private cache: AudioCache;
 
-  constructor(settings: VoxSettings, _plugin: Plugin) {
+  constructor(settings: VoxSettings, plugin: Plugin) {
     this.settings = settings;
+    this.cache = new AudioCache(plugin);
   }
 
   async synthesizeToUrl(sentence: string, voice: string, rate = 1.0): Promise<string> {
@@ -34,6 +37,20 @@ export class ElevenLabsBackend implements UrlBackend {
       throw new Error(
         "ElevenLabs voice_id not set — add one as the default voice or via folder mapping.",
       );
+    }
+
+    const speed = Math.min(1.2, Math.max(0.7, rate));
+    const cacheParts: AudioCacheParts = {
+      engine: "elevenlabs",
+      model: this.settings.elevenlabsModel,
+      voice,
+      rate: speed,
+      text: sentence,
+    };
+
+    if (this.settings.cacheEnabled) {
+      const cached = await this.cache.get(cacheParts);
+      if (cached) return this.toObjectUrl(cached);
     }
 
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}`;
@@ -51,7 +68,7 @@ export class ElevenLabsBackend implements UrlBackend {
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
-          speed: Math.min(1.2, Math.max(0.7, rate)),
+          speed,
         },
       }),
       throw: false,
@@ -61,7 +78,15 @@ export class ElevenLabsBackend implements UrlBackend {
       throw new Error(`ElevenLabs TTS failed: ${res.status} ${res.text}`);
     }
 
-    const blob = new Blob([res.arrayBuffer], { type: "audio/mpeg" });
+    if (this.settings.cacheEnabled) {
+      await this.cache.set(cacheParts, res.arrayBuffer);
+    }
+
+    return this.toObjectUrl(res.arrayBuffer);
+  }
+
+  private toObjectUrl(audio: ArrayBuffer): string {
+    const blob = new Blob([audio], { type: "audio/mpeg" });
     return URL.createObjectURL(blob);
   }
 }
