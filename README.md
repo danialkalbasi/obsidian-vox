@@ -6,6 +6,15 @@ Each folder can have its own voice. Hover the sidebar icon to pick one and it st
 
 Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to start), **Browser** (free, no account needed).
 
+## Highlights
+
+- Read the current note aloud from the sidebar, command palette, status bar, or file menu
+- Pause, resume, and stop playback without leaving Obsidian
+- Choose between ElevenLabs, OpenAI, and the browser's built-in speech synthesis
+- Assign default voices globally, per folder, or per note frontmatter
+- Hover the sidebar icon to pick a voice and start reading immediately
+- Cache generated audio for identical text, voice, model, tone, and speed
+
 ## What I use it for
 
 - Hearing book notes in the author's voice
