@@ -82,24 +82,23 @@ export class VoiceBrowserModal extends Modal {
     // don't shift when the user types a search query.
     const colorIndex = (v: ElevenLabsVoice) => this.voices.indexOf(v);
 
-    const mine = filtered.filter((v) => this.isAdded(v.voice_id));
-    const others = filtered.filter((v) => !this.isAdded(v.voice_id));
+    // Split by ElevenLabs category: user-created first, premade library second.
+    const created = filtered.filter((v) => v.category !== "premade");
+    const premade = filtered.filter((v) => v.category === "premade");
 
-    if (mine.length > 0) {
+    if (created.length > 0) {
       this.listEl.createDiv({ cls: "vox-browser-section", text: "My voices" });
-      mine.forEach((v) => this.renderRow(this.listEl!, v, colorIndex(v), true));
+      created.forEach((v) => this.renderRow(this.listEl!, v, colorIndex(v)));
     }
 
-    if (others.length > 0) {
-      this.listEl.createDiv({
-        cls: "vox-browser-section",
-        text: mine.length > 0 ? "All voices" : "Voices",
-      });
-      others.forEach((v) => this.renderRow(this.listEl!, v, colorIndex(v), false));
+    if (premade.length > 0) {
+      this.listEl.createDiv({ cls: "vox-browser-section", text: "Voice library" });
+      premade.forEach((v) => this.renderRow(this.listEl!, v, colorIndex(v)));
     }
   }
 
-  private renderRow(container: HTMLElement, voice: ElevenLabsVoice, colorIndex: number, isMine: boolean) {
+  private renderRow(container: HTMLElement, voice: ElevenLabsVoice, colorIndex: number) {
+    const added = this.isAdded(voice.voice_id);
     const row = container.createDiv({ cls: "vox-browser-row" });
     row.dataset.voiceId = voice.voice_id;
 
@@ -126,7 +125,7 @@ export class VoiceBrowserModal extends Modal {
       previewBtn.addEventListener("click", () => this.togglePreview(voice, previewBtn));
     }
 
-    if (isMine) {
+    if (added) {
       actions.createEl("button", {
         cls: "vox-browser-btn vox-browser-btn--mine",
         text: "Added",
@@ -144,7 +143,6 @@ export class VoiceBrowserModal extends Modal {
         }
         await this.plugin.saveSettings();
         this.onAdd();
-        // Re-render so the voice moves up into "My voices"
         this.renderList();
       });
     }
