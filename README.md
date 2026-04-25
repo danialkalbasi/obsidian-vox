@@ -17,12 +17,11 @@ Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to sta
 
 ## Ideas for how to use it
 
-- Assign a cloned voice to a folder of book notes so each author sounds like themselves
 - Review meeting notes or decisions hands-free while you're away from your desk
 - Catch awkward phrasing in your own writing by hearing it read back
 - Work through a long research note without staring at a screen
-- Give each folder a distinct voice — Philosophy, Fiction, Work — so context shifts feel intentional
 - Proofread in a second language by listening for rhythm and flow rather than reading
+- Practice a presentation or speech by listening back to your notes and hearing how it lands
 
 ## Setup
 
@@ -53,7 +52,7 @@ A few things I've noticed:
 
 ### Add voices to Vox
 
-Go to **Settings → Vox → Browse voices**. The browser loads your full ElevenLabs library — premade voices and anything you've cloned or created. Each entry shows gender, age, accent, and use case. Click **▶** to hear a preview clip, then **Add** to save it.
+Go to **Settings → Vox → Browse voices**. The browser loads your full ElevenLabs library: premade voices and anything you've cloned or created. Each entry shows gender, age, accent, and use case. Click **▶** to hear a preview clip, then **Add** to save it.
 
 Added voices appear as chips below the button. Click a chip to set it as the default. Click **×** to remove it.
 
