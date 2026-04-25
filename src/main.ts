@@ -29,6 +29,27 @@ const ICON_READ = "vox-read";
 const ICON_PAUSE = "vox-pause";
 const ICON_PLAY = "vox-play";
 const ICON_STOP = "vox-stop";
+const OPENAI_VOICES = [
+  "alloy",
+  "ash",
+  "ballad",
+  "cedar",
+  "coral",
+  "echo",
+  "fable",
+  "marin",
+  "nova",
+  "onyx",
+  "sage",
+  "shimmer",
+  "verse",
+];
+
+const SPEED_LIMITS: Record<VoxSettings["engine"], [number, number, number]> = {
+  elevenlabs: [0.7, 1.2, 0.05],
+  openai: [0.25, 4.0, 0.05],
+  browser: [0.6, 2.0, 0.05],
+};
 
 /** Move HTML `title` to `data-vox-title-stash` on `root` and descendants so the native tooltip does not compete with custom UI. */
 function stashNativeTitles(root: HTMLElement) {
@@ -338,6 +359,7 @@ export default class VoxPlugin extends Plugin {
 
   private registerVoicePicker(anchor: HTMLElement) {
     let closeTimer: number;
+    let speedSaveTimer: number;
 
     const getVoices = (): { label: string; id: string }[] => {
       const { engine, elevenlabsVoices } = this.settings;
@@ -345,11 +367,44 @@ export default class VoxPlugin extends Plugin {
         return elevenlabsVoices.map((v) => ({ label: v.name, id: v.id }));
       }
       if (engine === "openai") {
-        return ["alloy","ash","ballad","cedar","coral","echo","fable","marin","nova","onyx","sage","shimmer","verse"]
-          .map((v) => ({ label: v, id: v }));
+        return OPENAI_VOICES.map((v) => ({ label: v, id: v }));
       }
       return [];
     };
+
+    const getDefaultVoice = () => {
+      if (this.settings.engine === "elevenlabs")
+        return this.settings.voiceElevenlabs;
+      if (this.settings.engine === "openai") return this.settings.voiceOpenai;
+      return this.settings.voiceBrowser;
+    };
+
+    const setDefaultVoice = async (voice: string) => {
+      if (this.settings.engine === "elevenlabs") {
+        this.settings.voiceElevenlabs = voice;
+      } else if (this.settings.engine === "openai") {
+        this.settings.voiceOpenai = voice;
+      } else {
+        this.settings.voiceBrowser = voice;
+      }
+      await this.saveSettings();
+    };
+
+    const selectVoice = (voice: string) => {
+      this.pendingVoice = voice;
+      setDefaultVoice(voice).catch((err) => {
+        console.error("Vox: failed to save default voice", err);
+      });
+      closePicker();
+      this.readActiveNote();
+    };
+
+    const providerLabel = () =>
+      this.settings.engine === "elevenlabs"
+        ? "ElevenLabs"
+        : this.settings.engine === "openai"
+          ? "OpenAI"
+          : "Browser";
 
     const closePicker = () => {
       this.voicePickerEl?.remove();
@@ -363,7 +418,6 @@ export default class VoxPlugin extends Plugin {
     const openPicker = () => {
       if (this.player.getState() !== "idle") return;
       const voices = getVoices();
-      if (voices.length === 0) return;
 
       closePicker();
 
@@ -380,23 +434,99 @@ export default class VoxPlugin extends Plugin {
       const picker = document.body.createEl("div", { cls: "vox-voice-picker" });
       this.voicePickerEl = picker;
 
-      const activeId = this.pendingVoice ?? this.settings.voiceElevenlabs ?? this.settings.voiceOpenai;
-      for (const voice of voices) {
-        const item = picker.createEl("div", {
-          cls: "vox-voice-picker-item" + (voice.id === activeId ? " vox-voice-picker-item--active" : ""),
-          text: voice.label,
-        });
-        item.addEventListener("mousedown", (e) => {
-          e.preventDefault();
-          this.pendingVoice = voice.id;
-          closePicker();
-          this.readActiveNote();
+      const header = picker.createDiv({ cls: "vox-voice-picker-header" });
+      const titleWrap = header.createDiv();
+      titleWrap.createDiv({ cls: "vox-voice-picker-kicker", text: providerLabel() });
+      titleWrap.createDiv({ cls: "vox-voice-picker-title", text: "Voices" });
+
+      const voicesWrap = picker.createDiv({ cls: "vox-voice-picker-list" });
+      const defaultVoice = getDefaultVoice();
+      const activeId = this.pendingVoice ?? defaultVoice;
+      if (voices.length === 0) {
+        voicesWrap.createDiv({
+          cls: "vox-voice-picker-empty",
+          text:
+            this.settings.engine === "elevenlabs"
+              ? "No voices yet. Add an ElevenLabs voice in settings."
+              : "No voices available for this provider.",
         });
       }
 
+      voices.forEach((voice, index) => {
+        const isDefault = voice.id === defaultVoice;
+        const item = voicesWrap.createDiv({
+          cls:
+            "vox-voice-picker-item" +
+            (voice.id === activeId ? " vox-voice-picker-item--active" : ""),
+        });
+        item.setAttribute("role", "button");
+        item.setAttribute("tabindex", "0");
+
+        const avatar = item.createDiv({
+          cls: `vox-voice-picker-avatar vox-voice-picker-avatar--${index % 10}`,
+        });
+        setIcon(avatar, "audio-lines");
+
+        const body = item.createDiv({ cls: "vox-voice-picker-item-body" });
+        body.createDiv({ cls: "vox-voice-picker-name", text: voice.label });
+        body.createDiv({
+          cls: "vox-voice-picker-meta",
+          text: isDefault ? "Default" : "Click to use",
+        });
+
+        item.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          selectVoice(voice.id);
+        });
+        item.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          selectVoice(voice.id);
+        });
+      });
+
+      const [minSpeed, maxSpeed, step] = SPEED_LIMITS[this.settings.engine];
+      const speed = Math.min(maxSpeed, Math.max(minSpeed, this.settings.rate));
+      const speedWrap = picker.createDiv({ cls: "vox-voice-picker-speed" });
+      const speedHeader = speedWrap.createDiv({ cls: "vox-voice-picker-speed-header" });
+      speedHeader.createSpan({ text: "Speed" });
+      const speedValue = speedHeader.createSpan({
+        cls: "vox-voice-picker-speed-value",
+        text: `${speed.toFixed(2)}x`,
+      });
+      const speedSlider = speedWrap.createEl("input", {
+        type: "range",
+        cls: "vox-voice-picker-speed-slider",
+      });
+      speedSlider.min = String(minSpeed);
+      speedSlider.max = String(maxSpeed);
+      speedSlider.step = String(step);
+      speedSlider.value = String(speed);
+      speedSlider.addEventListener("input", () => {
+        const next = Number(speedSlider.value);
+        this.settings.rate = next;
+        this.player.setRate(next);
+        speedValue.setText(`${next.toFixed(2)}x`);
+        clearTimeout(speedSaveTimer);
+        speedSaveTimer = window.setTimeout(() => {
+          this.saveSettings().catch((err) => {
+            console.error("Vox: failed to save speed", err);
+          });
+        }, 250);
+      });
+
       const rect = anchor.getBoundingClientRect();
-      picker.style.left = `${rect.right + 10}px`;
-      picker.style.top = `${rect.top}px`;
+      const gap = 10;
+      const left =
+        rect.right + gap + picker.offsetWidth > window.innerWidth
+          ? Math.max(gap, rect.left - picker.offsetWidth - gap)
+          : rect.right + gap;
+      const top = Math.min(
+        Math.max(gap, rect.top),
+        window.innerHeight - picker.offsetHeight - gap,
+      );
+      picker.style.left = `${left}px`;
+      picker.style.top = `${top}px`;
 
       picker.addEventListener("mouseenter", () => clearTimeout(closeTimer));
       picker.addEventListener("mouseleave", () => {
