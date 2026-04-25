@@ -15,13 +15,14 @@ Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to sta
 - Hover the sidebar icon to pick a voice and start reading immediately
 - Cache generated audio for identical text, voice, model, tone, and speed
 
-## What I use it for
+## Ideas for how to use it
 
-- Hearing book notes in the author's voice
-- Reviewing meeting notes or decisions hands-free
-- Catching awkward phrasing in my own writing by hearing it read back
-- Going through a long research note without staring at a screen
-- Assigning a distinct voice to each folder so context shifts feel intentional
+- Assign a cloned voice to a folder of book notes so each author sounds like themselves
+- Review meeting notes or decisions hands-free while you're away from your desk
+- Catch awkward phrasing in your own writing by hearing it read back
+- Work through a long research note without staring at a screen
+- Give each folder a distinct voice — Philosophy, Fiction, Work — so context shifts feel intentional
+- Proofread in a second language by listening for rhythm and flow rather than reading
 
 ## Setup
 
