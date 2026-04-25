@@ -2,6 +2,7 @@ import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type VoxPlugin from "./main";
 import { AudioCache } from "./tts/cache";
 import { OPENAI_VOICES, SPEED_LIMITS } from "./constants";
+import { VoiceBrowserModal } from "./voice-browser";
 
 export type TtsEngine = "browser" | "elevenlabs" | "openai";
 
@@ -236,6 +237,18 @@ export class VoxSettingTab extends PluginSettingTab {
         );
       // Add voice row
       section(containerEl, "Voices");
+
+      new Setting(containerEl)
+        .setName("Browse ElevenLabs voices")
+        .setDesc("Search the full voice library, preview, and add in one step.")
+        .addButton((b) =>
+          b
+            .setButtonText("Browse voices")
+            .setCta()
+            .setDisabled(!s.elevenlabsApiKey)
+            .onClick(() => new VoiceBrowserModal(this.plugin, () => this.display()).open()),
+        );
+
       let newVoiceName = "";
       let newVoiceId = "";
       const addVoiceSetting = new Setting(containerEl)

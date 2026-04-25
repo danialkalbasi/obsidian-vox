@@ -367,6 +367,175 @@
   cursor: pointer;
 }
 
+/* ── Voice browser modal ─────────────────────────────────────── */
+.vox-browser-modal {
+  width: min(580px, 90vw);
+}
+
+.vox-browser {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vox-browser-search {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+  background: color-mix(in srgb, var(--background-modifier-hover) 60%, transparent);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-family: var(--font-interface);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.vox-browser-search:focus {
+  border-color: var(--color-accent);
+  background: var(--background-primary);
+}
+
+.vox-browser-list {
+  overflow-y: auto;
+  max-height: min(520px, calc(100vh - 240px));
+  margin: 0 -16px;
+  padding: 4px 8px;
+}
+
+.vox-browser-state {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 40px 16px;
+}
+
+.vox-browser-state--error {
+  color: var(--text-error);
+}
+
+.vox-browser-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  transition: background 100ms ease;
+}
+
+.vox-browser-row:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 80%, transparent);
+}
+
+.vox-browser-row--added {
+  opacity: 0.45;
+}
+
+.vox-browser-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: white;
+  flex-shrink: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.vox-browser-avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.vox-browser-body {
+  min-width: 0;
+}
+
+.vox-browser-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vox-browser-labels {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+}
+
+.vox-browser-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.vox-browser-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 80%, transparent);
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-interface);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 100ms ease, border-color 100ms ease, transform 80ms ease;
+}
+
+.vox-browser-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.vox-browser-btn:active {
+  transform: scale(0.94);
+}
+
+.vox-browser-btn--icon {
+  width: 28px;
+  padding: 0;
+}
+
+.vox-browser-btn--icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.vox-browser-btn--add {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.1);
+  border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.28);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.vox-browser-btn--add:hover {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.18);
+}
+
+.vox-browser-btn--done {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ── Settings: voice chips ───────────────────────────────────── */
 .vox-voice-tags {
   display: flex;
