@@ -1,6 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type VoxPlugin from "./main";
 import { AudioCache } from "./tts/cache";
+import { OPENAI_VOICES, SPEED_LIMITS } from "./constants";
 
 export type TtsEngine = "browser" | "elevenlabs" | "openai";
 
@@ -33,6 +34,9 @@ export interface VoxSettings {
   showStartNotice: boolean;
 
   cacheEnabled: boolean;
+
+  /** Development helper: reload this plugin when built files change. */
+  devReloadEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: VoxSettings = {
@@ -54,6 +58,7 @@ export const DEFAULT_SETTINGS: VoxSettings = {
   },
   showStartNotice: true,
   cacheEnabled: false,
+  devReloadEnabled: false,
 };
 
 function section(containerEl: HTMLElement, title: string, desc?: string) {
@@ -94,12 +99,7 @@ export class VoxSettingTab extends PluginSettingTab {
           }),
       );
 
-    const speedLimits: Record<TtsEngine, [number, number, number]> = {
-      elevenlabs: [0.7, 1.2, 0.05],
-      openai:     [0.25, 4.0, 0.05],
-      browser:    [0.6, 2.0, 0.05],
-    };
-    const [minSpeed, maxSpeed, step] = speedLimits[s.engine];
+    const [minSpeed, maxSpeed, step] = SPEED_LIMITS[s.engine];
     const clampedRate = Math.min(maxSpeed, Math.max(minSpeed, s.rate));
     new Setting(containerEl)
       .setName("Speed")
@@ -173,7 +173,7 @@ export class VoxSettingTab extends PluginSettingTab {
         .setName("Voice")
         .setDesc("The character of the voice.")
         .addDropdown((dd) => {
-          for (const v of ["alloy","ash","ballad","cedar","coral","echo","fable","marin","nova","onyx","sage","shimmer","verse"]) {
+          for (const v of OPENAI_VOICES) {
             dd.addOption(v, v);
           }
           return dd
@@ -359,5 +359,16 @@ export class VoxSettingTab extends PluginSettingTab {
         this.display();
       }),
     );
+
+    section(containerEl, "Development");
+    new Setting(containerEl)
+      .setName("Auto-reload while developing")
+      .setDesc("Reload Vox in Obsidian when main.js, styles.css, or manifest.json changes.")
+      .addToggle((tg) =>
+        tg.setValue(s.devReloadEnabled).onChange(async (value) => {
+          s.devReloadEnabled = value;
+          await this.plugin.saveSettings();
+        }),
+      );
   }
 }

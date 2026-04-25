@@ -2,6 +2,7 @@ import { requestUrl, type Plugin } from "obsidian";
 import type { VoxSettings } from "../settings";
 import type { UrlBackend } from "./backend";
 import { AudioCache, type AudioCacheParts } from "./cache";
+import { SPEED_LIMITS } from "../constants";
 
 /**
  * ElevenLabs TTS backend (`/v1/text-to-speech/{voice_id}`).
@@ -39,7 +40,8 @@ export class ElevenLabsBackend implements UrlBackend {
       );
     }
 
-    const speed = Math.min(1.2, Math.max(0.7, rate));
+    const [minSpeed, maxSpeed] = SPEED_LIMITS.elevenlabs;
+    const speed = Math.min(maxSpeed, Math.max(minSpeed, rate));
     const cacheParts: AudioCacheParts = {
       engine: "elevenlabs",
       model: this.settings.elevenlabsModel,

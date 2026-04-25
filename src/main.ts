@@ -4,21 +4,23 @@ import {
   MarkdownView,
   TFile,
   addIcon,
+  normalizePath,
   setIcon,
 } from "obsidian";
 import { DEFAULT_SETTINGS, VoxSettings, VoxSettingTab } from "./settings";
 import { Player, PlayerState } from "./player";
 import { stripMarkdown } from "./markdown";
 import { createBackend, TtsBackend } from "./tts/backend";
+import { OPENAI_VOICES, SPEED_LIMITS } from "./constants";
 
 /**
  * Vox plugin entry point.
  *
  * Responsibilities:
- *   1. Register UI affordances: read / pause-resume / stop ribbon icons,
+ *   1. Register UI affordances: read ribbon icon, voice/playback popover,
  *      editor menu item, command palette commands.
- *   2. Hold the singleton TTS `Player` and a status-bar indicator that
- *      mirrors its state.
+ *   2. Hold the singleton TTS `Player` and mirror its state in the ribbon
+ *      icon + popover controls.
  *   3. Load/save `VoxSettings`, including per-folder voice overrides.
  *
  * The heavy lifting lives in `player.ts`, `markdown.ts`, and `tts/`.
@@ -29,26 +31,11 @@ const ICON_READ = "vox-read";
 const ICON_PAUSE = "vox-pause";
 const ICON_PLAY = "vox-play";
 const ICON_STOP = "vox-stop";
-const OPENAI_VOICES = [
-  "alloy",
-  "ash",
-  "ballad",
-  "cedar",
-  "coral",
-  "echo",
-  "fable",
-  "marin",
-  "nova",
-  "onyx",
-  "sage",
-  "shimmer",
-  "verse",
-];
+const DEV_RELOAD_FILES = ["main.js", "styles.css", "manifest.json"];
 
-const SPEED_LIMITS: Record<VoxSettings["engine"], [number, number, number]> = {
-  elevenlabs: [0.7, 1.2, 0.05],
-  openai: [0.25, 4.0, 0.05],
-  browser: [0.6, 2.0, 0.05],
+type PluginManager = {
+  disablePlugin(id: string): Promise<void>;
+  enablePlugin(id: string): Promise<void>;
 };
 
 /** Move HTML `title` to `data-vox-title-stash` on `root` and descendants so the native tooltip does not compete with custom UI. */
@@ -107,15 +94,20 @@ export default class VoxPlugin extends Plugin {
   player!: Player;
   private backend!: TtsBackend;
 
-  // UI elements whose appearance depends on player state. Held as
-  // fields so the state listener can mutate them without re-querying.
-  private statusEl: HTMLElement | null = null;
+  // UI elements whose appearance depends on player state. Held as fields
+  // so the state listener can mutate them without re-querying.
   private readRibbonEl: HTMLElement | null = null;
-  private stopRibbonEl: HTMLElement | null = null;
   private unsubscribeState: (() => void) | null = null;
   private pendingVoice: string | null = null;
   private voicePickerEl: HTMLElement | null = null;
   private tooltipObserver: MutationObserver | null = null;
+  private timerInterval: number | null = null;
+  private timerEl: HTMLElement | null = null;
+  private voicePickerCloseTimer: number | null = null;
+  private speedSaveTimer: number | null = null;
+  private devReloadInterval: number | null = null;
+  private devReloadSnapshot: Record<string, string> = {};
+  private devReloading = false;
 
   async onload() {
     await this.loadSettings();
@@ -128,35 +120,17 @@ export default class VoxPlugin extends Plugin {
     this.player = new Player(this.backend);
 
     // ── Ribbon icons ────────────────────────────────────────────
-    // Single morphing icon: speaker (idle) → pause (playing) → play (paused).
-    // A separate stop icon appears only while active.
+    // Single icon: click reads when idle; during playback, controls live
+    // in the popover so pause/stop stay grouped with voice controls.
     this.readRibbonEl = this.addRibbonIcon(ICON_READ, "Vox: read current note", () => {
       if (this.player.getState() === "idle") {
         this.readActiveNote();
       } else {
-        this.player.togglePause();
+        this.openVoicePicker(this.readRibbonEl);
       }
     });
     this.readRibbonEl.addClass("vox-ribbon");
     this.registerVoicePicker(this.readRibbonEl);
-
-    this.stopRibbonEl = this.addRibbonIcon(
-      ICON_STOP,
-      "Vox: stop reading",
-      () => this.player.stop(),
-    );
-    this.stopRibbonEl.addClass("vox-ribbon");
-    this.stopRibbonEl.addClass("vox-ribbon--stop");
-    this.applyStopRibbonVisibility(false);
-
-    // ── Status bar ──────────────────────────────────────────────
-    // Single clickable pill that shows current playback state.
-    // Click behaviour: toggle pause when playing/paused, no-op idle.
-    this.statusEl = this.addStatusBarItem();
-    this.statusEl.addClass("vox-status");
-    this.statusEl.addEventListener("click", () => {
-      if (this.player.getState() !== "idle") this.player.togglePause();
-    });
 
     // ── Commands (palette + hotkeys) ────────────────────────────
     this.addCommand({
@@ -198,15 +172,7 @@ export default class VoxPlugin extends Plugin {
     this.unsubscribeState = this.player.onStateChange((s) =>
       this.renderState(s),
     );
-
-    // Ribbon layout can finish (or re-apply theme styles) after onload; re-sync
-    // visibility so the stop control stays hidden until a real session.
-    this.app.workspace.onLayoutReady(() => {
-      this.applyStopRibbonVisibility(this.player.getState() !== "idle");
-      requestAnimationFrame(() => {
-        this.applyStopRibbonVisibility(this.player.getState() !== "idle");
-      });
-    });
+    void this.configureDevReload();
 
     this.addSettingTab(new VoxSettingTab(this.app, this));
   }
@@ -214,7 +180,83 @@ export default class VoxPlugin extends Plugin {
   async onunload() {
     this.unsubscribeState?.();
     this.player?.stop();
+    this.stopTimer();
+    this.stopDevReload();
     this.stopSuppressingRibbonTooltip();
+  }
+
+  private pluginDir(): string {
+    return normalizePath(
+      this.manifest.dir ?? `.obsidian/plugins/${this.manifest.id}`,
+    );
+  }
+
+  private pluginManager(): PluginManager | null {
+    const maybeApp = this.app as typeof this.app & {
+      plugins?: Partial<PluginManager>;
+    };
+    const plugins = maybeApp.plugins;
+    if (
+      typeof plugins?.disablePlugin !== "function" ||
+      typeof plugins?.enablePlugin !== "function"
+    ) {
+      return null;
+    }
+    return plugins as PluginManager;
+  }
+
+  private async statReloadFiles(): Promise<Record<string, string>> {
+    const next: Record<string, string> = {};
+    for (const file of DEV_RELOAD_FILES) {
+      const path = normalizePath(`${this.pluginDir()}/${file}`);
+      const stat = await this.app.vault.adapter.stat(path);
+      next[file] = stat ? `${stat.mtime}:${stat.size}` : "missing";
+    }
+    return next;
+  }
+
+  private async reloadPlugin() {
+    if (this.devReloading) return;
+    const manager = this.pluginManager();
+    if (!manager) {
+      console.warn("Vox: Obsidian plugin manager is unavailable for auto-reload.");
+      return;
+    }
+
+    this.devReloading = true;
+    this.stopDevReload();
+    new Notice("Vox: reloading plugin...");
+    await manager.disablePlugin(this.manifest.id);
+    await manager.enablePlugin(this.manifest.id);
+  }
+
+  private stopDevReload() {
+    if (this.devReloadInterval !== null) {
+      window.clearInterval(this.devReloadInterval);
+      this.devReloadInterval = null;
+    }
+  }
+
+  async configureDevReload() {
+    this.stopDevReload();
+    this.devReloadSnapshot = {};
+    if (!this.settings.devReloadEnabled) return;
+
+    this.devReloadSnapshot = await this.statReloadFiles();
+    this.devReloadInterval = window.setInterval(() => {
+      this.statReloadFiles()
+        .then((next) => {
+          const changed = DEV_RELOAD_FILES.some(
+            (file) => next[file] !== this.devReloadSnapshot[file],
+          );
+          if (!changed) return;
+          this.devReloadSnapshot = next;
+          void this.reloadPlugin();
+        })
+        .catch((err) => {
+          console.warn("Vox: dev auto-reload check failed", err);
+        });
+    }, 800);
   }
 
   private hideMatchingRibbonTooltips(label: string) {
@@ -260,66 +302,46 @@ export default class VoxPlugin extends Plugin {
     }
   }
 
-  /**
-   * Repaint the status bar + pause ribbon icon to reflect player state.
-   * Called synchronously by the Player's state-change event.
-   */
-  /** Wrapper around the stop icon; often `.side-dock-ribbon-action`. */
-  private getStopRibbonSlot(): HTMLElement | null {
-    if (!this.stopRibbonEl) return null;
-    return (
-      (this.stopRibbonEl.closest(
-        ".side-dock-ribbon-action",
-      ) as HTMLElement | null) ?? (this.stopRibbonEl.parentElement as HTMLElement | null)
-    );
+  private formatElapsed(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
-  /**
-   * Show or hide the stop control. Uses inline `display` with `important` so
-   * it wins over theme `!important` rules, and hides the full ribbon slot so
-   * there is no empty gap.
-   */
-  private applyStopRibbonVisibility(active: boolean) {
-    if (!this.stopRibbonEl) return;
-    this.stopRibbonEl.classList.toggle("vox-ribbon--stop--visible", active);
-    const icon = this.stopRibbonEl;
-    const slot = this.getStopRibbonSlot();
-    if (active) {
-      icon.style.removeProperty("display");
-      slot?.style.removeProperty("display");
-    } else {
-      icon.style.setProperty("display", "none", "important");
-      slot?.style.setProperty("display", "none", "important");
+  private updateTimer() {
+    this.timerEl?.setText(this.formatElapsed(this.player.getElapsedSeconds()));
+  }
+
+  private startTimer() {
+    this.stopTimer();
+    this.updateTimer();
+    this.timerInterval = window.setInterval(() => this.updateTimer(), 1000);
+  }
+
+  private stopTimer() {
+    if (this.timerInterval !== null) {
+      window.clearInterval(this.timerInterval);
+      this.timerInterval = null;
     }
+    this.timerEl = null;
   }
 
+  /**
+   * Repaint the ribbon icon to reflect player state. Called synchronously by
+   * the Player's state-change event.
+   */
   private renderState(state: PlayerState) {
-    const active = state !== "idle";
-
     if (this.readRibbonEl) {
       const icon = state === "idle" ? ICON_READ : state === "playing" ? ICON_PAUSE : ICON_PLAY;
-      const label = state === "idle" ? "Vox: read current note" : state === "playing" ? "Vox: pause" : "Vox: resume";
+      const label = state === "idle" ? "Vox: read current note" : "Vox: playback controls";
       setIcon(this.readRibbonEl, icon);
       this.readRibbonEl.setAttribute("aria-label", label);
     }
 
-    this.applyStopRibbonVisibility(active);
+    if (state === "playing") this.startTimer();
+    else this.stopTimer();
 
-    if (this.statusEl) {
-      this.statusEl.empty();
-      if (!active) {
-        // Hidden when nothing's happening — no visual noise.
-        this.statusEl.style.display = "none";
-        return;
-      }
-      this.statusEl.style.display = "";
-      const icon = this.statusEl.createSpan({ cls: "vox-status-icon" });
-      setIcon(icon, state === "playing" ? ICON_PAUSE : ICON_PLAY);
-      this.statusEl.createSpan({
-        cls: "vox-status-text",
-        text: state === "playing" ? " Reading" : " Paused",
-      });
-    }
+    if (this.voicePickerEl) this.openVoicePicker(this.readRibbonEl);
   }
 
   async readActiveNote() {
@@ -357,164 +379,221 @@ export default class VoxPlugin extends Plugin {
     }
   }
 
-  private registerVoicePicker(anchor: HTMLElement) {
-    let closeTimer: number;
-    let speedSaveTimer: number;
+  private getVoices(): { label: string; id: string }[] {
+    const { engine, elevenlabsVoices } = this.settings;
+    if (engine === "elevenlabs") {
+      return elevenlabsVoices.map((v) => ({ label: v.name, id: v.id }));
+    }
+    if (engine === "openai") {
+      return OPENAI_VOICES.map((v) => ({ label: v, id: v }));
+    }
+    return [];
+  }
 
-    const getVoices = (): { label: string; id: string }[] => {
-      const { engine, elevenlabsVoices } = this.settings;
-      if (engine === "elevenlabs") {
-        return elevenlabsVoices.map((v) => ({ label: v.name, id: v.id }));
-      }
-      if (engine === "openai") {
-        return OPENAI_VOICES.map((v) => ({ label: v, id: v }));
-      }
-      return [];
-    };
+  private getDefaultVoice(): string {
+    if (this.settings.engine === "elevenlabs")
+      return this.settings.voiceElevenlabs;
+    if (this.settings.engine === "openai") return this.settings.voiceOpenai;
+    return this.settings.voiceBrowser;
+  }
 
-    const getDefaultVoice = () => {
-      if (this.settings.engine === "elevenlabs")
-        return this.settings.voiceElevenlabs;
-      if (this.settings.engine === "openai") return this.settings.voiceOpenai;
-      return this.settings.voiceBrowser;
-    };
+  private async setDefaultVoice(voice: string) {
+    if (this.settings.engine === "elevenlabs") {
+      this.settings.voiceElevenlabs = voice;
+    } else if (this.settings.engine === "openai") {
+      this.settings.voiceOpenai = voice;
+    } else {
+      this.settings.voiceBrowser = voice;
+    }
+    await this.saveSettings();
+  }
 
-    const setDefaultVoice = async (voice: string) => {
-      if (this.settings.engine === "elevenlabs") {
-        this.settings.voiceElevenlabs = voice;
-      } else if (this.settings.engine === "openai") {
-        this.settings.voiceOpenai = voice;
-      } else {
-        this.settings.voiceBrowser = voice;
-      }
-      await this.saveSettings();
-    };
+  private selectVoice(voice: string) {
+    this.pendingVoice = voice;
+    this.setDefaultVoice(voice).catch((err) => {
+      console.error("Vox: failed to save default voice", err);
+    });
+    this.closeVoicePicker();
+    this.readActiveNote();
+  }
 
-    const selectVoice = (voice: string) => {
-      this.pendingVoice = voice;
-      setDefaultVoice(voice).catch((err) => {
-        console.error("Vox: failed to save default voice", err);
+  private providerLabel(): string {
+    switch (this.settings.engine) {
+      case "elevenlabs":
+        return "ElevenLabs";
+      case "openai":
+        return "OpenAI";
+      case "browser":
+        return "Browser";
+    }
+  }
+
+  private closeVoicePicker() {
+    const anchor = this.readRibbonEl;
+    this.voicePickerEl?.remove();
+    this.voicePickerEl = null;
+    const label = anchor?.getAttribute("data-vox-label");
+    if (anchor && label) anchor.setAttribute("aria-label", label);
+    this.stopSuppressingRibbonTooltip();
+    if (anchor) restoreNativeTitles(anchor);
+  }
+
+  private renderPlaybackControls(picker: HTMLElement, state: PlayerState) {
+    if (state === "idle") return;
+
+    const playback = picker.createDiv({
+      cls: "vox-voice-picker-playback" + (state === "playing" ? " vox-voice-picker-playback--playing" : ""),
+    });
+    const copy = playback.createDiv({ cls: "vox-voice-picker-playback-copy" });
+    copy.createDiv({
+      cls: "vox-voice-picker-playback-title",
+      text: state === "playing" ? "Reading" : "Paused",
+    });
+    this.timerEl = copy.createDiv({ cls: "vox-voice-picker-timer" });
+    this.updateTimer();
+
+    const controls = playback.createDiv({ cls: "vox-voice-picker-controls" });
+    const toggleButton = controls.createEl("button", {
+      cls: "vox-voice-picker-control-button",
+      attr: {
+        "aria-label": state === "playing" ? "Pause" : "Resume",
+        title: state === "playing" ? "Pause" : "Resume",
+      },
+    });
+    setIcon(toggleButton, state === "playing" ? ICON_PAUSE : ICON_PLAY);
+    toggleButton.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    toggleButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.player.togglePause();
+    });
+
+    const stopButton = controls.createEl("button", {
+      cls: "vox-voice-picker-control-button vox-voice-picker-control-button--danger",
+      attr: { "aria-label": "Stop", title: "Stop" },
+    });
+    setIcon(stopButton, ICON_STOP);
+    stopButton.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    stopButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.player.stop();
+      this.closeVoicePicker();
+    });
+  }
+
+  private openVoicePicker(anchor: HTMLElement | null) {
+    if (!anchor) return;
+    const voices = this.getVoices();
+
+    this.closeVoicePicker();
+
+    // Stash aria-label + HTML title and clear them so Obsidian's / the
+    // browser's native tooltip doesn't appear alongside the picker.
+    anchor.setAttribute("data-vox-label", anchor.getAttribute("aria-label") ?? "");
+    const label = anchor.getAttribute("data-vox-label") ?? "";
+    anchor.removeAttribute("aria-label");
+    stashNativeTitles(anchor);
+    this.startSuppressingRibbonTooltip(label);
+
+    const picker = document.body.createEl("div", { cls: "vox-voice-picker" });
+    this.voicePickerEl = picker;
+
+    const header = picker.createDiv({ cls: "vox-voice-picker-header" });
+    const titleWrap = header.createDiv();
+    titleWrap.createDiv({ cls: "vox-voice-picker-kicker", text: this.providerLabel() });
+    titleWrap.createDiv({ cls: "vox-voice-picker-title", text: "Voices" });
+
+    const state = this.player.getState();
+    this.renderPlaybackControls(picker, state);
+
+    const voicesWrap = picker.createDiv({ cls: "vox-voice-picker-list" });
+    const defaultVoice = this.getDefaultVoice();
+    const activeId = this.pendingVoice ?? defaultVoice;
+    if (voices.length === 0) {
+      voicesWrap.createDiv({
+        cls: "vox-voice-picker-empty",
+        text:
+          this.settings.engine === "elevenlabs"
+            ? "No voices yet. Add an ElevenLabs voice in settings."
+            : "No voices available for this provider.",
       });
-      closePicker();
-      this.readActiveNote();
-    };
+    }
 
-    const providerLabel = () =>
-      this.settings.engine === "elevenlabs"
-        ? "ElevenLabs"
-        : this.settings.engine === "openai"
-          ? "OpenAI"
-          : "Browser";
+    voices.forEach((voice, index) => {
+      const isDefault = voice.id === defaultVoice;
+      const item = voicesWrap.createDiv({
+        cls:
+          "vox-voice-picker-item" +
+          (voice.id === activeId ? " vox-voice-picker-item--active" : ""),
+      });
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
 
-    const closePicker = () => {
-      this.voicePickerEl?.remove();
-      this.voicePickerEl = null;
-      const label = anchor.getAttribute("data-vox-label");
-      if (label) anchor.setAttribute("aria-label", label);
-      this.stopSuppressingRibbonTooltip();
-      restoreNativeTitles(anchor);
-    };
+      const avatar = item.createDiv({
+        cls: `vox-voice-picker-avatar vox-voice-picker-avatar--${index % 10}`,
+      });
+      setIcon(avatar, "audio-lines");
 
-    const openPicker = () => {
-      if (this.player.getState() !== "idle") return;
-      const voices = getVoices();
-
-      closePicker();
-
-      // Stash aria-label + HTML title and clear them so Obsidian's / the
-      // browser's native tooltip doesn't appear alongside the picker.
-      if (!anchor.getAttribute("data-vox-label")) {
-        anchor.setAttribute("data-vox-label", anchor.getAttribute("aria-label") ?? "");
-      }
-      const label = anchor.getAttribute("data-vox-label") ?? "";
-      anchor.removeAttribute("aria-label");
-      stashNativeTitles(anchor);
-      this.startSuppressingRibbonTooltip(label);
-
-      const picker = document.body.createEl("div", { cls: "vox-voice-picker" });
-      this.voicePickerEl = picker;
-
-      const header = picker.createDiv({ cls: "vox-voice-picker-header" });
-      const titleWrap = header.createDiv();
-      titleWrap.createDiv({ cls: "vox-voice-picker-kicker", text: providerLabel() });
-      titleWrap.createDiv({ cls: "vox-voice-picker-title", text: "Voices" });
-
-      const voicesWrap = picker.createDiv({ cls: "vox-voice-picker-list" });
-      const defaultVoice = getDefaultVoice();
-      const activeId = this.pendingVoice ?? defaultVoice;
-      if (voices.length === 0) {
-        voicesWrap.createDiv({
-          cls: "vox-voice-picker-empty",
-          text:
-            this.settings.engine === "elevenlabs"
-              ? "No voices yet. Add an ElevenLabs voice in settings."
-              : "No voices available for this provider.",
-        });
+      const body = item.createDiv({ cls: "vox-voice-picker-item-body" });
+      body.createDiv({ cls: "vox-voice-picker-name", text: voice.label });
+      if (isDefault) {
+        body.createDiv({ cls: "vox-voice-picker-meta", text: "Default" });
       }
 
-      voices.forEach((voice, index) => {
-        const isDefault = voice.id === defaultVoice;
-        const item = voicesWrap.createDiv({
-          cls:
-            "vox-voice-picker-item" +
-            (voice.id === activeId ? " vox-voice-picker-item--active" : ""),
-        });
-        item.setAttribute("role", "button");
-        item.setAttribute("tabindex", "0");
+      const checkEl = item.createDiv({ cls: "vox-voice-picker-item-check" });
+      setIcon(checkEl, "check");
 
-        const avatar = item.createDiv({
-          cls: `vox-voice-picker-avatar vox-voice-picker-avatar--${index % 10}`,
-        });
-        setIcon(avatar, "audio-lines");
-
-        const body = item.createDiv({ cls: "vox-voice-picker-item-body" });
-        body.createDiv({ cls: "vox-voice-picker-name", text: voice.label });
-        body.createDiv({
-          cls: "vox-voice-picker-meta",
-          text: isDefault ? "Default" : "Click to use",
-        });
-
-        item.addEventListener("mousedown", (e) => {
-          e.preventDefault();
-          selectVoice(voice.id);
-        });
-        item.addEventListener("keydown", (e) => {
-          if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          selectVoice(voice.id);
-        });
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        this.selectVoice(voice.id);
       });
+      item.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        this.selectVoice(voice.id);
+      });
+    });
 
-      const [minSpeed, maxSpeed, step] = SPEED_LIMITS[this.settings.engine];
-      const speed = Math.min(maxSpeed, Math.max(minSpeed, this.settings.rate));
-      const speedWrap = picker.createDiv({ cls: "vox-voice-picker-speed" });
-      const speedHeader = speedWrap.createDiv({ cls: "vox-voice-picker-speed-header" });
-      speedHeader.createSpan({ text: "Speed" });
-      const speedValue = speedHeader.createSpan({
-        cls: "vox-voice-picker-speed-value",
-        text: `${speed.toFixed(2)}x`,
-      });
-      const speedSlider = speedWrap.createEl("input", {
-        type: "range",
-        cls: "vox-voice-picker-speed-slider",
-      });
-      speedSlider.min = String(minSpeed);
-      speedSlider.max = String(maxSpeed);
-      speedSlider.step = String(step);
-      speedSlider.value = String(speed);
-      speedSlider.addEventListener("input", () => {
-        const next = Number(speedSlider.value);
-        this.settings.rate = next;
-        this.player.setRate(next);
-        speedValue.setText(`${next.toFixed(2)}x`);
-        clearTimeout(speedSaveTimer);
-        speedSaveTimer = window.setTimeout(() => {
-          this.saveSettings().catch((err) => {
-            console.error("Vox: failed to save speed", err);
-          });
-        }, 250);
-      });
+    const [minSpeed, maxSpeed, step] = SPEED_LIMITS[this.settings.engine];
+    const speed = Math.min(maxSpeed, Math.max(minSpeed, this.settings.rate));
+    const speedWrap = picker.createDiv({ cls: "vox-voice-picker-speed" });
+    const speedHeader = speedWrap.createDiv({ cls: "vox-voice-picker-speed-header" });
+    speedHeader.createSpan({ text: "Speed" });
+    const speedValue = speedHeader.createSpan({
+      cls: "vox-voice-picker-speed-value",
+      text: `${speed.toFixed(2)}x`,
+    });
+    const speedSlider = speedWrap.createEl("input", {
+      type: "range",
+      cls: "vox-voice-picker-speed-slider",
+    });
+    speedSlider.min = String(minSpeed);
+    speedSlider.max = String(maxSpeed);
+    speedSlider.step = String(step);
+    speedSlider.value = String(speed);
+    speedSlider.addEventListener("input", () => {
+      const next = Number(speedSlider.value);
+      this.settings.rate = next;
+      this.player.setRate(next);
+      speedValue.setText(`${next.toFixed(2)}x`);
+      if (this.speedSaveTimer !== null) window.clearTimeout(this.speedSaveTimer);
+      this.speedSaveTimer = window.setTimeout(() => {
+        this.saveSettings().catch((err) => {
+          console.error("Vox: failed to save speed", err);
+        });
+      }, 250);
+    });
 
+    picker.style.visibility = "hidden";
+    requestAnimationFrame(() => {
+      if (!this.voicePickerEl) return;
       const rect = anchor.getBoundingClientRect();
       const gap = 10;
       const left =
@@ -527,19 +606,32 @@ export default class VoxPlugin extends Plugin {
       );
       picker.style.left = `${left}px`;
       picker.style.top = `${top}px`;
+      picker.style.visibility = "";
+    });
 
-      picker.addEventListener("mouseenter", () => clearTimeout(closeTimer));
-      picker.addEventListener("mouseleave", () => {
-        closeTimer = window.setTimeout(closePicker, 150);
-      });
-    };
+    picker.addEventListener("mouseenter", () => {
+      if (this.voicePickerCloseTimer !== null)
+        window.clearTimeout(this.voicePickerCloseTimer);
+    });
+    picker.addEventListener("mouseleave", () => {
+      this.voicePickerCloseTimer = window.setTimeout(
+        () => this.closeVoicePicker(),
+        150,
+      );
+    });
+  }
 
+  private registerVoicePicker(anchor: HTMLElement) {
     anchor.addEventListener("mouseenter", () => {
-      clearTimeout(closeTimer);
-      openPicker();
+      if (this.voicePickerCloseTimer !== null)
+        window.clearTimeout(this.voicePickerCloseTimer);
+      this.openVoicePicker(anchor);
     });
     anchor.addEventListener("mouseleave", () => {
-      closeTimer = window.setTimeout(closePicker, 150);
+      this.voicePickerCloseTimer = window.setTimeout(
+        () => this.closeVoicePicker(),
+        150,
+      );
     });
   }
 
@@ -637,5 +729,6 @@ export default class VoxPlugin extends Plugin {
     this.backend = createBackend(this.settings, this);
     this.player.setBackend(this.backend);
     this.player.setRate(this.settings.rate);
+    await this.configureDevReload();
   }
 }

@@ -56,7 +56,7 @@ export class OpenAIBackend implements UrlBackend {
         model: this.settings.openaiModel,
         voice: cacheParts.voice,
         input: sentence,
-        format: "mp3",
+        response_format: "mp3",
         speed: rate,
         ...(this.settings.openaiInstructions?.trim()
           ? { instructions: this.settings.openaiInstructions.trim() }
