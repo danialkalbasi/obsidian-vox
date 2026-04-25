@@ -334,6 +334,7 @@ export class VoxSettingTab extends PluginSettingTab {
     let newVoice = elevenlabsVoiceOptions?.[0]?.id ?? "";
     const addFolderSetting = new Setting(containerEl)
       .setName("Add folder mapping")
+      .setDesc("Map a folder prefix to a voice. The longest matching prefix wins. Override per note with voice: \"name\" in frontmatter.")
       .addText((t) => t.setPlaceholder("Philosophy/").onChange((v) => (newPrefix = v)));
     if (elevenlabsVoiceOptions) {
       addFolderSetting.addDropdown((dd) => {

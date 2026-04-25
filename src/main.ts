@@ -508,7 +508,7 @@ export default class VoxPlugin extends Plugin {
     const header = picker.createDiv({ cls: "vox-voice-picker-header" });
     const titleWrap = header.createDiv();
     titleWrap.createDiv({ cls: "vox-voice-picker-kicker", text: this.providerLabel() });
-    titleWrap.createDiv({ cls: "vox-voice-picker-title", text: "Voices" });
+    titleWrap.createDiv({ cls: "vox-voice-picker-title", text: "Select a voice" });
 
     const state = this.player.getState();
     this.renderPlaybackControls(picker, state);

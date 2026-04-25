@@ -1,19 +1,16 @@
 ![Vox banner](assets/readme-banner.png)
 
-**Vox** reads your Obsidian notes aloud.
+**Vox** reads your Obsidian notes aloud. Hearing your writing is different from reading it.
 
 Each folder can have its own voice. Hover the sidebar icon to pick one and it starts reading immediately.
 
 Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to start), **Browser** (free, no account needed).
 
-## Highlights
+## Features
 
-- Read the current note aloud from the sidebar, command palette, popover, or file menu
-- Pause, resume, and stop playback without leaving Obsidian
-- Choose between ElevenLabs, OpenAI, and the browser's built-in speech synthesis
-- Assign default voices globally, per folder, or per note frontmatter
-- Hover the sidebar icon to pick a voice and start reading immediately
-- Cache generated audio for identical text, voice, model, tone, and speed
+- Reads any note aloud with full playback controls (pause, resume, stop)
+- Three providers: ElevenLabs, OpenAI, Browser
+- Voice assignment: globally, per folder, or per note
 
 ## Ideas for how to use it
 
@@ -81,39 +78,6 @@ Uses your OS's built-in speech synthesis.
 Quality depends entirely on your OS. Fine for short reads, not great for anything longer.
 
 Speed range: 0.6x - 2.0x.
-
-## Usage
-
-**Sidebar icon** morphs based on state:
-
-- idle: click to start reading
-- playing/paused: click to open playback controls
-
-**Hover the icon** and the Vox popover opens. Pick a voice and it starts reading immediately.
-
-**Playback controls** live in the popover while active: pause/resume, stop, elapsed timer, and speed.
-
-**Command palette:**
-
-- `Vox: Read active note aloud`
-- `Vox: Stop reading`
-- `Vox: Toggle play / pause`
-
-**File menu:** right-click any `.md` file → `Vox: read aloud`
-
-### Per-folder voices
-
-Go to **Folder voices** in settings. Map a folder prefix to a voice. The longest matching prefix wins, so `Philosophy/Stoics/` beats `Philosophy/` if both match.
-
-### Per-note override
-
-Override the voice for a single note via frontmatter:
-
-```yaml
-voice: "nova"
-```
-
-Works with any provider. For ElevenLabs, use the voice ID. For OpenAI, use the voice name.
 
 ## Development
 
