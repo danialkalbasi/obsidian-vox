@@ -8,7 +8,7 @@ Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to sta
 
 ## Highlights
 
-- Read the current note aloud from the sidebar, command palette, status bar, or file menu
+- Read the current note aloud from the sidebar, command palette, popover, or file menu
 - Pause, resume, and stop playback without leaving Obsidian
 - Choose between ElevenLabs, OpenAI, and the browser's built-in speech synthesis
 - Assign default voices globally, per folder, or per note frontmatter
@@ -88,13 +88,11 @@ Speed range: 0.6x - 2.0x.
 **Sidebar icon** morphs based on state:
 
 - idle: click to start reading
-- playing: click to pause
-- paused: click to resume
-- a stop icon appears alongside while active, click to stop entirely
+- playing/paused: click to open playback controls
 
-**Hover the icon** and a voice picker opens. Pick a voice and it starts reading immediately.
+**Hover the icon** and the Vox popover opens. Pick a voice and it starts reading immediately.
 
-**Status bar** shows `Reading` or `Paused` while active. Click to toggle. Hidden when idle.
+**Playback controls** live in the popover while active: pause/resume, stop, elapsed timer, and speed.
 
 **Command palette:**
 
@@ -129,3 +127,6 @@ npm run dev
 npm run build      # production build
 npm run typecheck  # type-check without building
 ```
+
+For Obsidian development, enable **Settings → Vox → Auto-reload while developing**.
+Then run `npm run dev`; Vox reloads itself in Obsidian when `main.js`, `styles.css`, or `manifest.json` changes.

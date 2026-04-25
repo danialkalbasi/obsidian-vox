@@ -14,7 +14,7 @@ export type PlayerStateListener = (state: PlayerState) => void;
  *     direct `speak()` for the browser SpeechSynthesis backend).
  *   - Maintain a queue so the user can pause, resume, and stop.
  *   - Emit state transitions (`idle` ↔ `playing` ↔ `paused`) so the UI
- *     layer (ribbon icons, status bar) can stay in sync without polling.
+   *     layer (ribbon icon, popover controls) can stay in sync without polling.
  */
 export class Player {
   private backend: TtsBackend;
@@ -25,6 +25,8 @@ export class Player {
   private rate = 1.0;
   private tokenCounter = 0;
   private activeToken = 0;
+  private elapsedMs = 0;
+  private playingSince: number | null = null;
 
   private state: PlayerState = "idle";
   private listeners: Set<PlayerStateListener> = new Set();
@@ -45,6 +47,12 @@ export class Player {
     return this.state;
   }
 
+  getElapsedSeconds(): number {
+    const currentRun =
+      this.playingSince === null ? 0 : Date.now() - this.playingSince;
+    return Math.floor((this.elapsedMs + currentRun) / 1000);
+  }
+
   /**
    * Subscribe to state transitions. Returns an unsubscribe function;
    * the main plugin keeps that around and calls it from `onunload`.
@@ -57,6 +65,17 @@ export class Player {
 
   private setState(next: PlayerState) {
     if (this.state === next) return;
+    if (this.state === "playing" && this.playingSince !== null) {
+      this.elapsedMs += Date.now() - this.playingSince;
+      this.playingSince = null;
+    }
+    if (next === "playing") {
+      this.playingSince = Date.now();
+    }
+    if (next === "idle") {
+      this.elapsedMs = 0;
+      this.playingSince = null;
+    }
     this.state = next;
     for (const l of this.listeners) l(next);
   }
@@ -79,6 +98,8 @@ export class Player {
     this.stop();
     const token = ++this.tokenCounter;
     this.activeToken = token;
+    this.elapsedMs = 0;
+    this.playingSince = null;
 
     this.queue = splitIntoSentences(text);
     this.cursor = 0;
