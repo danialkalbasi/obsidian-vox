@@ -531,9 +531,27 @@
   background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.18);
 }
 
-.vox-browser-btn--done {
-  opacity: 0.4;
+.vox-browser-btn--mine {
+  background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.08);
+  border-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.22);
+  color: var(--color-accent);
+  font-weight: 600;
   cursor: default;
+}
+
+.vox-browser-section {
+  padding: 8px 8px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.vox-browser-section:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 50%, transparent);
+  padding-top: 12px;
 }
 
 /* ── Settings: voice chips ───────────────────────────────────── */

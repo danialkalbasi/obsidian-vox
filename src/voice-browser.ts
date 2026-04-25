@@ -27,7 +27,6 @@ export class VoiceBrowserModal extends Modal {
     contentEl.empty();
     contentEl.addClass("vox-browser");
 
-    // Search
     const searchInput = contentEl.createEl("input", {
       cls: "vox-browser-search",
       type: "text",
@@ -79,23 +78,36 @@ export class VoiceBrowserModal extends Modal {
       return;
     }
 
-    filtered.forEach((voice, i) => this.renderRow(this.listEl!, voice, i));
+    // Stable color index: position in the full unfiltered list so colors
+    // don't shift when the user types a search query.
+    const colorIndex = (v: ElevenLabsVoice) => this.voices.indexOf(v);
+
+    const mine = filtered.filter((v) => this.isAdded(v.voice_id));
+    const others = filtered.filter((v) => !this.isAdded(v.voice_id));
+
+    if (mine.length > 0) {
+      this.listEl.createDiv({ cls: "vox-browser-section", text: "My voices" });
+      mine.forEach((v) => this.renderRow(this.listEl!, v, colorIndex(v), true));
+    }
+
+    if (others.length > 0) {
+      this.listEl.createDiv({
+        cls: "vox-browser-section",
+        text: mine.length > 0 ? "All voices" : "Voices",
+      });
+      others.forEach((v) => this.renderRow(this.listEl!, v, colorIndex(v), false));
+    }
   }
 
-  private renderRow(container: HTMLElement, voice: ElevenLabsVoice, index: number) {
-    const added = this.isAdded(voice.voice_id);
-    const row = container.createDiv({
-      cls: "vox-browser-row" + (added ? " vox-browser-row--added" : ""),
-    });
+  private renderRow(container: HTMLElement, voice: ElevenLabsVoice, colorIndex: number, isMine: boolean) {
+    const row = container.createDiv({ cls: "vox-browser-row" });
     row.dataset.voiceId = voice.voice_id;
 
-    // Avatar — reuse the popover gradient palette
     const avatar = row.createDiv({
-      cls: `vox-browser-avatar vox-voice-picker-avatar--${index % 10}`,
+      cls: `vox-browser-avatar vox-voice-picker-avatar--${colorIndex % 10}`,
     });
     setIcon(avatar, "audio-lines");
 
-    // Body
     const body = row.createDiv({ cls: "vox-browser-body" });
     body.createDiv({ cls: "vox-browser-name", text: voice.name });
     const labelText = LABEL_ORDER.map((k) => voice.labels[k]).filter(Boolean).join(" · ");
@@ -103,7 +115,6 @@ export class VoiceBrowserModal extends Modal {
       body.createDiv({ cls: "vox-browser-labels", text: labelText });
     }
 
-    // Actions
     const actions = row.createDiv({ cls: "vox-browser-actions" });
 
     if (voice.preview_url) {
@@ -115,13 +126,17 @@ export class VoiceBrowserModal extends Modal {
       previewBtn.addEventListener("click", () => this.togglePreview(voice, previewBtn));
     }
 
-    const addBtn = actions.createEl("button", {
-      cls: "vox-browser-btn " + (added ? "vox-browser-btn--done" : "vox-browser-btn--add"),
-      text: added ? "Added" : "Add",
-    });
-    addBtn.disabled = added;
-
-    if (!added) {
+    if (isMine) {
+      actions.createEl("button", {
+        cls: "vox-browser-btn vox-browser-btn--mine",
+        text: "Added",
+        attr: { disabled: "true" },
+      });
+    } else {
+      const addBtn = actions.createEl("button", {
+        cls: "vox-browser-btn vox-browser-btn--add",
+        text: "Add",
+      });
       addBtn.addEventListener("click", async () => {
         this.plugin.settings.elevenlabsVoices.push({ name: voice.name, id: voice.voice_id });
         if (!this.plugin.settings.voiceElevenlabs) {
@@ -129,10 +144,8 @@ export class VoiceBrowserModal extends Modal {
         }
         await this.plugin.saveSettings();
         this.onAdd();
-        row.addClass("vox-browser-row--added");
-        addBtn.textContent = "Added";
-        addBtn.className = "vox-browser-btn vox-browser-btn--done";
-        addBtn.disabled = true;
+        // Re-render so the voice moves up into "My voices"
+        this.renderList();
       });
     }
   }

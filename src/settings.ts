@@ -238,7 +238,7 @@ export class VoxSettingTab extends PluginSettingTab {
       // Add voice row
       section(containerEl, "Voices");
 
-      new Setting(containerEl)
+      const browseSetting = new Setting(containerEl)
         .setName("Browse ElevenLabs voices")
         .setDesc("Search the full voice library, preview, and add in one step.")
         .addButton((b) =>
@@ -249,30 +249,9 @@ export class VoxSettingTab extends PluginSettingTab {
             .onClick(() => new VoiceBrowserModal(this.plugin, () => this.display()).open()),
         );
 
-      let newVoiceName = "";
-      let newVoiceId = "";
-      const addVoiceSetting = new Setting(containerEl)
-        .setName("Add voice")
-        .setDesc("Name + ElevenLabs voice ID.")
-        .addText((t) =>
-          t.setPlaceholder("Name").onChange((v) => (newVoiceName = v)),
-        )
-        .addText((t) =>
-          t.setPlaceholder("Voice ID").onChange((v) => (newVoiceId = v)),
-        )
-        .addButton((b) =>
-          b.setButtonText("Add").onClick(async () => {
-            if (!newVoiceName.trim() || !newVoiceId.trim()) return;
-            s.elevenlabsVoices.push({ name: newVoiceName.trim(), id: newVoiceId.trim() });
-            if (!s.voiceElevenlabs) s.voiceElevenlabs = newVoiceId.trim();
-            await this.plugin.saveSettings();
-            this.display();
-          }),
-        );
-
-      // Added voices as tags — click to set as default, × to remove
+      // Saved voices as chips — click to set as default, × to remove
       if (s.elevenlabsVoices.length > 0) {
-        const tags = addVoiceSetting.settingEl.createEl("div", { cls: "vox-voice-tags" });
+        const tags = browseSetting.settingEl.createEl("div", { cls: "vox-voice-tags" });
         for (const voice of s.elevenlabsVoices) {
           const isDefault = s.voiceElevenlabs === voice.id;
           const chip = tags.createEl("span", {

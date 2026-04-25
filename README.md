@@ -50,12 +50,11 @@ A few things I've noticed:
 - Stability 0.5, similarity boost 0.75 is a good starting point
 - Try the same prompt with different base voices. The description shapes personality, the base voice shapes timbre
 
-### Add the voice to Vox
+### Add voices to Vox
 
-1. In ElevenLabs, open the voice → copy the Voice ID
-2. In Vox settings → **Voices → Add voice**
-3. Give it a name (anything you'll recognise) and paste the Voice ID
-4. Click the chip to set it as default
+Go to **Settings → Vox → Browse voices**. The browser loads your full ElevenLabs library — premade voices and anything you've cloned or created. Each entry shows gender, age, accent, and use case. Click **▶** to hear a preview clip, then **Add** to save it.
+
+Added voices appear as chips below the button. Click a chip to set it as the default. Click **×** to remove it.
 
 Speed range: 0.7x - 1.2x. ElevenLabs applies it server-side, so quality stays clean.
 
