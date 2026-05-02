@@ -1,11 +1,11 @@
 import { requestUrl, type Plugin } from "obsidian";
 import type { VoxSettings } from "../settings";
-import type { UrlBackend } from "./backend";
+import type { UrlProvider } from "./provider";
 import { AudioCache, type AudioCacheParts } from "./cache";
 import { SPEED_LIMITS } from "../constants";
 
 /**
- * ElevenLabs TTS backend (`/v1/text-to-speech/{voice_id}`).
+ * ElevenLabs TTS provider (`/v1/text-to-speech/{voice_id}`).
  *
  * Uses the non-streaming endpoint for simplicity (ElevenLabs also
  * offers a streamed variant that returns audio in chunks; worth
@@ -18,7 +18,7 @@ import { SPEED_LIMITS } from "../constants";
  * faster and cheaper than `eleven_multilingual_v2` with minimal
  * quality difference for English prose.
  */
-export class ElevenLabsBackend implements UrlBackend {
+export class ElevenLabsProvider implements UrlProvider {
   readonly kind = "url" as const;
   private settings: VoxSettings;
   private cache: AudioCache;

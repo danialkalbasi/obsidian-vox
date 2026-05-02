@@ -1,10 +1,10 @@
 import { requestUrl, type Plugin } from "obsidian";
 import type { VoxSettings } from "../settings";
-import type { UrlBackend } from "./backend";
+import type { UrlProvider } from "./provider";
 import { AudioCache, type AudioCacheParts } from "./cache";
 
 /**
- * OpenAI TTS backend (`/v1/audio/speech`).
+ * OpenAI TTS provider (`/v1/audio/speech`).
  *
  * Endpoint returns the full synthesized audio as a single MP3 response.
  * No per-sentence streaming, but latency is low enough (~300-800ms for
@@ -16,7 +16,7 @@ import { AudioCache, type AudioCacheParts } from "./cache";
  * Cost reference (2025): tts-1 = $15 / 1M chars, tts-1-hd = $30 / 1M.
  * A typical 2000-char note costs $0.03-0.06.
  */
-export class OpenAIBackend implements UrlBackend {
+export class OpenAIProvider implements UrlProvider {
   readonly kind = "url" as const;
   private settings: VoxSettings;
   private cache: AudioCache;

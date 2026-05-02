@@ -59,7 +59,7 @@ export function stripMarkdown(md: string): string {
 
 /**
  * Split cleaned prose into sentence-ish chunks. Used by the player to
- * feed the TTS backend incrementally so streaming / first-audio latency
+ * feed the TTS provider incrementally so streaming / first-audio latency
  * stays low, and so pause/skip has sensible granularity.
  *
  * Not a linguist-grade sentence splitter — handles the common cases

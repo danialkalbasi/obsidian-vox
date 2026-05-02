@@ -1,10 +1,9 @@
-![Vox banner](assets/readme-banner.png)
+<h1 align="center">Vox</h1>
 
-**Vox** reads your Obsidian notes aloud. Hearing your writing is different from reading it.
-
-Each folder can have its own voice. Hover the sidebar icon to pick one and it starts reading immediately.
-
-Three providers: **ElevenLabs** (best quality), **OpenAI** (solid, easier to start), **Browser** (free, no account needed).
+<p align="center">
+  Listen to your notes with your favorite voices.<br /><br />
+  <img src="assets/demo.gif" alt="Vox demo" width="86%" style="border: 0; width: 86%; min-width: 240px; max-width: 100%;" />
+</p>
 
 ## Features
 

@@ -10,7 +10,7 @@ import {
 import { DEFAULT_SETTINGS, VoxSettings, VoxSettingTab } from "./settings";
 import { Player, PlayerState } from "./player";
 import { stripMarkdown } from "./markdown";
-import { createBackend, TtsBackend } from "./tts/backend";
+import { createProvider, TtsProvider } from "./tts/provider";
 import { OPENAI_VOICES, SPEED_LIMITS } from "./constants";
 
 /**
@@ -92,7 +92,7 @@ const ICONS: Record<string, string> = {
 export default class VoxPlugin extends Plugin {
   settings!: VoxSettings;
   player!: Player;
-  private backend!: TtsBackend;
+  private provider!: TtsProvider;
 
   // UI elements whose appearance depends on player state. Held as fields
   // so the state listener can mutate them without re-querying.
@@ -116,8 +116,8 @@ export default class VoxPlugin extends Plugin {
       addIcon(id, svg.trim());
     }
 
-    this.backend = createBackend(this.settings, this);
-    this.player = new Player(this.backend);
+    this.provider = createProvider(this.settings, this);
+    this.player = new Player(this.provider);
 
     // ── Ribbon icons ────────────────────────────────────────────
     // Single icon: click reads when idle; during playback, controls live
@@ -180,8 +180,18 @@ export default class VoxPlugin extends Plugin {
   async onunload() {
     this.unsubscribeState?.();
     this.player?.stop();
+    if (this.voicePickerCloseTimer !== null) {
+      window.clearTimeout(this.voicePickerCloseTimer);
+      this.voicePickerCloseTimer = null;
+    }
+    if (this.speedSaveTimer !== null) {
+      window.clearTimeout(this.speedSaveTimer);
+      this.speedSaveTimer = null;
+      await this.saveData(this.settings);
+    }
     this.stopTimer();
     this.stopDevReload();
+    this.closeVoicePicker();
     this.stopSuppressingRibbonTooltip();
   }
 
@@ -324,6 +334,120 @@ export default class VoxPlugin extends Plugin {
       this.timerInterval = null;
     }
     this.timerEl = null;
+  }
+
+  private normalizeSettings(
+    raw: (Record<string, unknown> & {
+      defaultVoice?: string;
+      folderVoices?: Record<string, string>;
+      folderVoicesByEngine?: Partial<
+        Record<VoxSettings["engine"], Record<string, string>>
+      >;
+    }) | null,
+  ): VoxSettings & {
+    defaultVoice?: string;
+    folderVoices?: Record<string, string>;
+  } {
+    const merged = Object.assign(
+      {},
+      DEFAULT_SETTINGS,
+      raw ?? {},
+    ) as VoxSettings & {
+      defaultVoice?: string;
+      folderVoices?: Record<string, string>;
+    };
+
+    const engines: VoxSettings["engine"][] = ["browser", "elevenlabs", "openai"];
+    const isEngine = (value: unknown): value is VoxSettings["engine"] =>
+      typeof value === "string" && engines.includes(value as VoxSettings["engine"]);
+    const isOpenAiVoice = (
+      value: unknown,
+    ): value is (typeof OPENAI_VOICES)[number] =>
+      typeof value === "string" &&
+      OPENAI_VOICES.includes(value as (typeof OPENAI_VOICES)[number]);
+    const asVoiceMap = (value: unknown): Record<string, string> => {
+      if (!value || typeof value !== "object") return {};
+      return Object.fromEntries(
+        Object.entries(value).filter(
+          ([key, voice]) => typeof key === "string" && typeof voice === "string",
+        ),
+      );
+    };
+
+    merged.engine = isEngine(raw?.engine) ? raw.engine : DEFAULT_SETTINGS.engine;
+
+    const [minSpeed, maxSpeed] = SPEED_LIMITS[merged.engine];
+    const rate =
+      typeof raw?.rate === "number" && Number.isFinite(raw.rate)
+        ? raw.rate
+        : DEFAULT_SETTINGS.rate;
+    merged.rate = Math.min(maxSpeed, Math.max(minSpeed, rate));
+
+    merged.voiceBrowser =
+      typeof raw?.voiceBrowser === "string"
+        ? raw.voiceBrowser
+        : DEFAULT_SETTINGS.voiceBrowser;
+    merged.voiceOpenai =
+      isOpenAiVoice(raw?.voiceOpenai)
+        ? raw.voiceOpenai
+        : DEFAULT_SETTINGS.voiceOpenai;
+    merged.voiceElevenlabs =
+      typeof raw?.voiceElevenlabs === "string"
+        ? raw.voiceElevenlabs
+        : DEFAULT_SETTINGS.voiceElevenlabs;
+
+    merged.elevenlabsApiKey =
+      typeof raw?.elevenlabsApiKey === "string"
+        ? raw.elevenlabsApiKey
+        : DEFAULT_SETTINGS.elevenlabsApiKey;
+    merged.openaiApiKey =
+      typeof raw?.openaiApiKey === "string"
+        ? raw.openaiApiKey
+        : DEFAULT_SETTINGS.openaiApiKey;
+    merged.elevenlabsModel =
+      raw?.elevenlabsModel === "eleven_turbo_v2_5" ||
+      raw?.elevenlabsModel === "eleven_multilingual_v2"
+        ? raw.elevenlabsModel
+        : DEFAULT_SETTINGS.elevenlabsModel;
+    merged.openaiModel =
+      raw?.openaiModel === "tts-1" || raw?.openaiModel === "tts-1-hd"
+        ? raw.openaiModel
+        : DEFAULT_SETTINGS.openaiModel;
+    merged.openaiInstructions =
+      typeof raw?.openaiInstructions === "string"
+        ? raw.openaiInstructions
+        : DEFAULT_SETTINGS.openaiInstructions;
+    merged.showStartNotice =
+      typeof raw?.showStartNotice === "boolean"
+        ? raw.showStartNotice
+        : DEFAULT_SETTINGS.showStartNotice;
+    merged.cacheEnabled =
+      typeof raw?.cacheEnabled === "boolean"
+        ? raw.cacheEnabled
+        : DEFAULT_SETTINGS.cacheEnabled;
+    merged.devReloadEnabled =
+      typeof raw?.devReloadEnabled === "boolean"
+        ? raw.devReloadEnabled
+        : DEFAULT_SETTINGS.devReloadEnabled;
+
+    merged.elevenlabsVoices = Array.isArray(raw?.elevenlabsVoices)
+      ? raw.elevenlabsVoices.flatMap((voice) =>
+          voice &&
+          typeof voice === "object" &&
+          typeof voice.name === "string" &&
+          typeof voice.id === "string"
+            ? [{ name: voice.name, id: voice.id }]
+            : [],
+        )
+      : DEFAULT_SETTINGS.elevenlabsVoices;
+
+    merged.folderVoicesByEngine = {
+      browser: asVoiceMap(raw?.folderVoicesByEngine?.browser),
+      elevenlabs: asVoiceMap(raw?.folderVoicesByEngine?.elevenlabs),
+      openai: asVoiceMap(raw?.folderVoicesByEngine?.openai),
+    };
+
+    return merged;
   }
 
   /**
@@ -637,7 +761,7 @@ export default class VoxPlugin extends Plugin {
 
   /**
    * Persona voice selection: folder prefix (longest wins) → frontmatter
-   * `voice:` key → global default. Centralised here so backends stay
+   * `voice:` key → global default. Centralised here so providers stay
    * voice-agnostic.
    */
   private resolveVoice(file: TFile): string {
@@ -677,19 +801,7 @@ export default class VoxPlugin extends Plugin {
           >;
         })
       | null;
-    const merged = Object.assign(
-      {},
-      DEFAULT_SETTINGS,
-      raw ?? {},
-    ) as VoxSettings & {
-      defaultVoice?: string;
-      folderVoices?: Record<string, string>;
-    };
-
-    merged.folderVoicesByEngine = {
-      ...DEFAULT_SETTINGS.folderVoicesByEngine,
-      ...(raw?.folderVoicesByEngine ?? {}),
-    };
+    const merged = this.normalizeSettings(raw);
 
     if (
       typeof merged.defaultVoice === "string" &&
@@ -726,8 +838,8 @@ export default class VoxPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
-    this.backend = createBackend(this.settings, this);
-    this.player.setBackend(this.backend);
+    this.provider = createProvider(this.settings, this);
+    this.player.setProvider(this.provider);
     this.player.setRate(this.settings.rate);
     await this.configureDevReload();
   }

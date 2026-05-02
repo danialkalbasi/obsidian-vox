@@ -1,7 +1,7 @@
-import type { SynthBackend } from "./backend";
+import type { SynthProvider } from "./provider";
 
 /**
- * Browser SpeechSynthesis backend — uses the Web Speech API's built-in
+ * Browser SpeechSynthesis provider — uses the Web Speech API's built-in
  * voice synthesizer. Zero cost, no network, works offline. Quality
  * varies by OS (macOS "Samantha" is decent; Windows SAPI voices are
  * notoriously robotic).
@@ -9,7 +9,7 @@ import type { SynthBackend } from "./backend";
  * Used as the default on first install so the plugin has something
  * functional even before the user configures API keys.
  */
-export class BrowserSynthBackend implements SynthBackend {
+export class BrowserSynthProvider implements SynthProvider {
   readonly kind = "synth" as const;
   private utterances: SpeechSynthesisUtterance[] = [];
 

@@ -1,5 +1,5 @@
 import { splitIntoSentences } from "./markdown";
-import type { TtsBackend } from "./tts/backend";
+import type { TtsProvider } from "./tts/provider";
 
 export type PlayerState = "idle" | "playing" | "paused";
 
@@ -10,14 +10,14 @@ export type PlayerStateListener = (state: PlayerState) => void;
  *
  * Responsibilities:
  *   - Segment cleaned text into sentences.
- *   - Ask the backend for each sentence's audio (URL for cloud engines,
- *     direct `speak()` for the browser SpeechSynthesis backend).
+ *   - Ask the provider for each sentence's audio (URL for cloud engines,
+ *     direct `speak()` for the browser SpeechSynthesis provider).
  *   - Maintain a queue so the user can pause, resume, and stop.
  *   - Emit state transitions (`idle` ↔ `playing` ↔ `paused`) so the UI
    *     layer (ribbon icon, popover controls) can stay in sync without polling.
  */
 export class Player {
-  private backend: TtsBackend;
+  private provider: TtsProvider;
   private queue: string[] = [];
   private cursor = 0;
   private audio: HTMLAudioElement | null = null;
@@ -31,12 +31,12 @@ export class Player {
   private state: PlayerState = "idle";
   private listeners: Set<PlayerStateListener> = new Set();
 
-  constructor(backend: TtsBackend) {
-    this.backend = backend;
+  constructor(provider: TtsProvider) {
+    this.provider = provider;
   }
 
-  setBackend(backend: TtsBackend) {
-    this.backend = backend;
+  setProvider(provider: TtsProvider) {
+    this.provider = provider;
   }
 
   setRate(rate: number) {
@@ -105,12 +105,12 @@ export class Player {
     this.cursor = 0;
     if (this.queue.length === 0) return;
 
-    if (this.backend.kind === "synth") {
+    if (this.provider.kind === "synth") {
       this.setState("playing");
       // Browser SpeechSynthesis queues utterances internally. We hook
       // the last one's `onend` to transition back to `idle` on natural
-      // completion; the backend will emit that callback for us.
-      await this.backend.speakAll(this.queue, voice, this.rate, () => {
+      // completion; the provider will emit that callback for us.
+      await this.provider.speakAll(this.queue, voice, this.rate, () => {
         if (this.isActive(token)) this.setState("idle");
       });
       return;
@@ -134,17 +134,17 @@ export class Player {
   private async playNext(token: number, voice: string): Promise<void> {
     if (!this.isActive(token)) return;
     if (this.cursor >= this.queue.length) {
-      // Natural end of queue — only fires for URL backends. Synth
-      // backend signals completion via the callback passed to speakAll.
+      // Natural end of queue — only fires for URL providers. Synth
+      // provider signals completion via the callback passed to speakAll.
       this.releaseCurrentAudioUrl();
       this.audio = null;
       if (this.isActive(token)) this.setState("idle");
       return;
     }
-    if (!this.audio || this.backend.kind !== "url") return;
+    if (!this.audio || this.provider.kind !== "url") return;
 
     const sentence = this.queue[this.cursor++];
-    const url = await this.backend.synthesizeToUrl(sentence, voice, this.rate);
+    const url = await this.provider.synthesizeToUrl(sentence, voice, this.rate);
     if (!this.isActive(token)) {
       URL.revokeObjectURL(url);
       return;
@@ -175,14 +175,14 @@ export class Player {
   pause() {
     if (this.state !== "playing") return;
     this.audio?.pause();
-    if (this.backend.kind === "synth") this.backend.pause();
+    if (this.provider.kind === "synth") this.provider.pause();
     this.setState("paused");
   }
 
   resume() {
     if (this.state !== "paused") return;
     this.audio?.play().catch(() => {});
-    if (this.backend.kind === "synth") this.backend.resume();
+    if (this.provider.kind === "synth") this.provider.resume();
     this.setState("playing");
   }
 
@@ -203,7 +203,7 @@ export class Player {
       this.audio = null;
     }
     this.releaseCurrentAudioUrl();
-    if (this.backend.kind === "synth") this.backend.stopAll();
+    if (this.provider.kind === "synth") this.provider.stopAll();
     this.queue = [];
     this.cursor = 0;
     this.setState("idle");

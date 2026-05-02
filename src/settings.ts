@@ -7,7 +7,7 @@ import { VoiceBrowserModal } from "./voice-browser";
 export type TtsEngine = "browser" | "elevenlabs" | "openai";
 
 export interface VoxSettings {
-  /** Active backend — only one runs at a time. */
+  /** Active provider — only one runs at a time. */
   engine: TtsEngine;
 
   /** Playback rate for `<audio>` and browser synth (1.0 = natural). */

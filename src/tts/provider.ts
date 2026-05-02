@@ -1,24 +1,24 @@
 import type { Plugin } from "obsidian";
 import type { VoxSettings } from "../settings";
-import { BrowserSynthBackend } from "./browser";
-import { OpenAIBackend } from "./openai";
-import { ElevenLabsBackend } from "./elevenlabs";
+import { BrowserSynthProvider } from "./browser";
+import { OpenAIProvider } from "./openai";
+import { ElevenLabsProvider } from "./elevenlabs";
 
 /**
- * TTS backend discriminated union.
+ * TTS provider discriminated union.
  *
  * Two kinds are supported:
- *   - `synth`: backend speaks directly (e.g. SpeechSynthesisAPI). It
+ *   - `synth`: provider speaks directly (e.g. SpeechSynthesisAPI). It
  *     owns its own queue, pause/resume, and stop.
- *   - `url`: backend synthesises audio per utterance and returns an
+ *   - `url`: provider synthesises audio per utterance and returns an
  *     object URL. The Player plays it through a shared <audio> element.
  *
  * Adding a new engine: implement one of the two shapes, export it, and
- * wire it into `createBackend`.
+ * wire it into `createProvider`.
  */
-export type TtsBackend = SynthBackend | UrlBackend;
+export type TtsProvider = SynthProvider | UrlProvider;
 
-export interface SynthBackend {
+export interface SynthProvider {
   kind: "synth";
   /**
    * Speak every sentence in order. `onDone` (if supplied) fires when
@@ -37,7 +37,7 @@ export interface SynthBackend {
   stopAll(): void;
 }
 
-export interface UrlBackend {
+export interface UrlProvider {
   kind: "url";
   /**
    * Synthesise one sentence. Should resolve to an object URL pointing
@@ -48,21 +48,21 @@ export interface UrlBackend {
 }
 
 /**
- * Factory: pick the concrete backend based on user settings. Called
+ * Factory: pick the concrete provider based on user settings. Called
  * from `VoxPlugin.onload` and again from `saveSettings` so the
- * live Player always has a fresh backend that reflects the latest
+ * live Player always has a fresh provider that reflects the latest
  * API keys / engine choice without a full plugin reload.
  */
-export function createBackend(
+export function createProvider(
   settings: VoxSettings,
   plugin: Plugin,
-): TtsBackend {
+): TtsProvider {
   switch (settings.engine) {
     case "browser":
-      return new BrowserSynthBackend();
+      return new BrowserSynthProvider();
     case "openai":
-      return new OpenAIBackend(settings, plugin);
+      return new OpenAIProvider(settings, plugin);
     case "elevenlabs":
-      return new ElevenLabsBackend(settings, plugin);
+      return new ElevenLabsProvider(settings, plugin);
   }
 }
