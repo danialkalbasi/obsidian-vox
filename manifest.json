@@ -3,7 +3,7 @@
   "name": "Vox",
   "version": "1.0.0",
   "minAppVersion": "1.4.0",
-  "description": "Reads your notes aloud with neural text-to-speech. ElevenLabs, OpenAI, or your browser's built-in voice. Different folders, different voices.",
+  "description": "Listen to your Obsidian notes with ElevenLabs, OpenAI, or browser TTS.",
   "author": "danialkalbasi",
   "authorUrl": "https://github.com/danialkalbasi",
   "isDesktopOnly": false
