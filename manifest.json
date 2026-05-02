@@ -1,10 +1,10 @@
 {
   "id": "vox",
   "name": "Vox",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "minAppVersion": "1.4.0",
   "description": "Reads your notes aloud with neural text-to-speech. ElevenLabs, OpenAI, or your browser's built-in voice. Different folders, different voices.",
   "author": "danialkalbasi",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/danialkalbasi",
   "isDesktopOnly": false
 }
