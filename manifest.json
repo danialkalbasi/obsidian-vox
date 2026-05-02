@@ -3,7 +3,7 @@
   "name": "Vox",
   "version": "1.0.0",
   "minAppVersion": "1.4.0",
-  "description": "Listen to your Obsidian notes with ElevenLabs, OpenAI, or browser TTS.",
+  "description": "Listen to your Obsidian notes with ElevenLabs, OpenAI, or browser voices.",
   "author": "danialkalbasi",
   "authorUrl": "https://github.com/danialkalbasi",
   "isDesktopOnly": false
