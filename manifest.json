@@ -1,7 +1,7 @@
 {
   "id": "vox-reader",
   "name": "Vox Reader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.4.0",
   "description": "Bring your notes to life with natural voices from ElevenLabs or OpenAI, or use the built-in browser voice.",
   "author": "danialkalbasi",
