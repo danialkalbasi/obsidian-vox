@@ -278,7 +278,7 @@ export default class VoxPlugin extends Plugin {
     if (!normalized) return;
 
     for (const tooltip of Array.from(
-      document.body.querySelectorAll<HTMLElement>(".tooltip"),
+      activeDocument.body.querySelectorAll<HTMLElement>(".tooltip"),
     )) {
       if (tooltip.getAttribute("data-vox-hidden-tooltip") === "true") continue;
       if (tooltip.textContent?.trim() !== normalized) continue;
@@ -296,7 +296,7 @@ export default class VoxPlugin extends Plugin {
     this.tooltipObserver = new MutationObserver(() => {
       this.hideMatchingRibbonTooltips(normalized);
     });
-    this.tooltipObserver.observe(document.body, {
+    this.tooltipObserver.observe(activeDocument.body, {
       childList: true,
       subtree: true,
     });
@@ -307,7 +307,7 @@ export default class VoxPlugin extends Plugin {
     this.tooltipObserver = null;
 
     for (const tooltip of Array.from(
-      document.body.querySelectorAll<HTMLElement>(
+      activeDocument.body.querySelectorAll<HTMLElement>(
         '.tooltip[data-vox-hidden-tooltip="true"]',
       ),
     )) {
@@ -435,14 +435,13 @@ export default class VoxPlugin extends Plugin {
         : DEFAULT_SETTINGS.devReloadEnabled;
 
     merged.elevenlabsVoices = Array.isArray(raw?.elevenlabsVoices)
-      ? raw.elevenlabsVoices.flatMap((voice) =>
-          voice &&
-          typeof voice === "object" &&
-          typeof voice.name === "string" &&
-          typeof voice.id === "string"
-            ? [{ name: voice.name, id: voice.id }]
-            : [],
-        )
+      ? raw.elevenlabsVoices.flatMap((voice) => {
+          if (!voice || typeof voice !== "object") return [];
+          const candidate = voice as { name?: unknown; id?: unknown };
+          return typeof candidate.name === "string" && typeof candidate.id === "string"
+            ? [{ name: candidate.name, id: candidate.id }]
+            : [];
+        })
       : DEFAULT_SETTINGS.elevenlabsVoices;
 
     merged.folderVoicesByEngine = {
@@ -632,7 +631,7 @@ export default class VoxPlugin extends Plugin {
     stashNativeTitles(anchor);
     this.startSuppressingRibbonTooltip(label);
 
-    const picker = document.body.createEl("div", { cls: "vox-voice-picker" });
+    const picker = activeDocument.body.createDiv({ cls: "vox-voice-picker" });
     this.voicePickerEl = picker;
 
     const header = picker.createDiv({ cls: "vox-voice-picker-header" });
@@ -781,7 +780,10 @@ export default class VoxPlugin extends Plugin {
     }
 
     const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-    const fmVoice = fm?.voice;
+    const fmVoice =
+      fm && typeof fm === "object" && "voice" in fm
+        ? (fm as { voice?: unknown }).voice
+        : null;
     if (typeof fmVoice === "string" && fmVoice.trim()) return fmVoice.trim();
 
     switch (this.settings.engine) {

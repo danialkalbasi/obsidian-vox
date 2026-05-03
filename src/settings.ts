@@ -118,7 +118,7 @@ export class VoxSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Show start notification")
-      .setDesc('Show a notice like "Vox: reading ..." when playback begins.')
+      .setDesc('Show a notice like "vox: reading ..." when playback begins.')
       .addToggle((tg) =>
         tg.setValue(s.showStartNotice).onChange(async (value) => {
           s.showStartNotice = value;
@@ -131,7 +131,7 @@ export class VoxSettingTab extends PluginSettingTab {
       section(containerEl, "Browser");
       new Setting(containerEl)
         .setName("Voice")
-        .setDesc("Name of the voice to use, e.g. Samantha or Alex on macOS. Leave blank for the system default.")
+        .setDesc("Name of the voice to use, e.g. Samantha or alex on macOS. Leave blank for the system default.")
         .addText((t) =>
           t
             .setPlaceholder("Samantha")
@@ -147,10 +147,10 @@ export class VoxSettingTab extends PluginSettingTab {
       section(containerEl, "OpenAI");
       new Setting(containerEl)
         .setName("API key")
-        .setDesc("Your OpenAI secret key. Find it at platform.openai.com.")
+        .setDesc("Your OpenAI secret key.")
         .addText((t) =>
           t
-            .setPlaceholder("sk-...")
+            .setPlaceholder("Paste your API key")
             .setValue(s.openaiApiKey)
             .onChange(async (v) => {
               s.openaiApiKey = v;
@@ -159,11 +159,11 @@ export class VoxSettingTab extends PluginSettingTab {
         );
       new Setting(containerEl)
         .setName("Model")
-        .setDesc("tts-1 is faster, tts-1-hd sounds better.")
+        .setDesc("Standard is faster, hd sounds better.")
         .addDropdown((dd) =>
           dd
-            .addOption("tts-1", "tts-1")
-            .addOption("tts-1-hd", "tts-1-hd")
+            .addOption("tts-1", "Standard")
+            .addOption("tts-1-hd", "HD")
             .setValue(s.openaiModel)
             .onChange(async (v) => {
               s.openaiModel = v as "tts-1" | "tts-1-hd";
@@ -215,7 +215,7 @@ export class VoxSettingTab extends PluginSettingTab {
         .setDesc("Your ElevenLabs API key. Find it in your profile settings.")
         .addText((t) =>
           t
-            .setPlaceholder("xi-api-key / sk_...")
+            .setPlaceholder("Paste your API key")
             .setValue(s.elevenlabsApiKey)
             .onChange(async (v) => {
               s.elevenlabsApiKey = v;
@@ -251,14 +251,14 @@ export class VoxSettingTab extends PluginSettingTab {
 
       // Saved voices as chips — click to set as default, × to remove
       if (s.elevenlabsVoices.length > 0) {
-        const tags = browseSetting.settingEl.createEl("div", { cls: "vox-voice-tags" });
+        const tags = browseSetting.settingEl.createDiv({ cls: "vox-voice-tags" });
         for (const voice of s.elevenlabsVoices) {
           const isDefault = s.voiceElevenlabs === voice.id;
-          const chip = tags.createEl("span", {
+          const chip = tags.createSpan({
             cls: "vox-voice-chip" + (isDefault ? " vox-voice-chip--active" : ""),
             title: isDefault ? "Default" : "Click to set as default",
           });
-          chip.createEl("span", { text: voice.name, cls: "vox-voice-chip-name" });
+          chip.createSpan({ text: voice.name, cls: "vox-voice-chip-name" });
           chip.addEventListener("click", (e) => {
             if ((e.target as HTMLElement).closest(".vox-voice-chip-remove")) return;
             s.voiceElevenlabs = voice.id;
@@ -267,7 +267,7 @@ export class VoxSettingTab extends PluginSettingTab {
               (err) => console.error("Vox: failed to save ElevenLabs voice", err),
             );
           });
-          const x = chip.createEl("span", { cls: "vox-voice-chip-remove", text: "×" });
+          const x = chip.createSpan({ cls: "vox-voice-chip-remove", text: "×" });
           x.addEventListener("click", () => {
             s.elevenlabsVoices = s.elevenlabsVoices.filter((v) => v.id !== voice.id);
             if (s.voiceElevenlabs === voice.id) s.voiceElevenlabs = s.elevenlabsVoices[0]?.id ?? "";
@@ -346,7 +346,7 @@ export class VoxSettingTab extends PluginSettingTab {
         return dd.setValue(newVoice).onChange((v) => (newVoice = v));
       });
     } else {
-      addFolderSetting.addText((t) => t.setPlaceholder("voice id").onChange((v) => (newVoice = v)));
+      addFolderSetting.addText((t) => t.setPlaceholder("Voice ID").onChange((v) => (newVoice = v)));
     }
     addFolderSetting.addButton((b) =>
       b.setButtonText("Add").onClick(async () => {

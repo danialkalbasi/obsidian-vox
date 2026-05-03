@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "lint": "eslint src --max-warnings=0",
+    "build": "npm run lint && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "typecheck": "tsc -noEmit -skipLibCheck"
   },
   "keywords": [
@@ -19,11 +20,13 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@typescript-eslint/parser": "^8.59.1",
     "builtin-modules": "^3.3.0",
     "esbuild": "^0.25.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-obsidianmd": "^0.2.9",
     "obsidian": "^1.7.2",
     "tslib": "^2.6.2",
     "typescript": "^5.4.0"
-  },
-  "dependencies": {}
+  }
 }
