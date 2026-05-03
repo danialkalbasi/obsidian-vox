@@ -1,6 +1,6 @@
 {
   "name": "obsidian-vox",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Reads your Obsidian notes aloud with neural text-to-speech.",
   "main": "main.js",
   "scripts": {

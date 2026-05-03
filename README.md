@@ -21,7 +21,7 @@
 
 ## Setup
 
-1. Go to **Settings → Community plugins**, click **Open plugins folder**, drop the plugin folder in (`.obsidian/plugins/vox/`)
+1. Go to **Settings → Community plugins**, click **Open plugins folder**, drop the plugin folder in (`.obsidian/plugins/vox-reader/`)
 2. Enable it under **Settings → Community plugins**
 3. Open **Settings → Vox**, pick your provider
 
