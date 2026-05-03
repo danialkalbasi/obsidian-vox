@@ -124,7 +124,9 @@ export default class VoxPlugin extends Plugin {
     // in the popover so pause/stop stay grouped with voice controls.
     this.readRibbonEl = this.addRibbonIcon(ICON_READ, "Vox: read current note", () => {
       if (this.player.getState() === "idle") {
-        this.readActiveNote();
+        void this.readActiveNote().catch((err) => {
+          console.error("Vox: failed to read active note", err);
+        });
       } else {
         this.openVoicePicker(this.readRibbonEl);
       }
@@ -177,7 +179,7 @@ export default class VoxPlugin extends Plugin {
     this.addSettingTab(new VoxSettingTab(this.app, this));
   }
 
-  async onunload() {
+  onunload() {
     this.unsubscribeState?.();
     this.player?.stop();
     if (this.voicePickerCloseTimer !== null) {
@@ -187,7 +189,9 @@ export default class VoxPlugin extends Plugin {
     if (this.speedSaveTimer !== null) {
       window.clearTimeout(this.speedSaveTimer);
       this.speedSaveTimer = null;
-      await this.saveData(this.settings);
+      void this.saveData(this.settings).catch((err) => {
+        console.error("Vox: failed to flush settings on unload", err);
+      });
     }
     this.stopTimer();
     this.stopDevReload();
@@ -279,7 +283,7 @@ export default class VoxPlugin extends Plugin {
       if (tooltip.getAttribute("data-vox-hidden-tooltip") === "true") continue;
       if (tooltip.textContent?.trim() !== normalized) continue;
       tooltip.setAttribute("data-vox-hidden-tooltip", "true");
-      tooltip.style.display = "none";
+      tooltip.addClass("vox-hidden-tooltip");
     }
   }
 
@@ -307,7 +311,7 @@ export default class VoxPlugin extends Plugin {
         '.tooltip[data-vox-hidden-tooltip="true"]',
       ),
     )) {
-      tooltip.style.removeProperty("display");
+      tooltip.removeClass("vox-hidden-tooltip");
       tooltip.removeAttribute("data-vox-hidden-tooltip");
     }
   }
@@ -538,7 +542,9 @@ export default class VoxPlugin extends Plugin {
       console.error("Vox: failed to save default voice", err);
     });
     this.closeVoicePicker();
-    this.readActiveNote();
+    void this.readActiveNote().catch((err) => {
+      console.error("Vox: failed to read active note", err);
+    });
   }
 
   private providerLabel(): string {
@@ -715,7 +721,7 @@ export default class VoxPlugin extends Plugin {
       }, 250);
     });
 
-    picker.style.visibility = "hidden";
+    picker.addClass("vox-voice-picker--hidden");
     requestAnimationFrame(() => {
       if (!this.voicePickerEl) return;
       const rect = anchor.getBoundingClientRect();
@@ -730,7 +736,7 @@ export default class VoxPlugin extends Plugin {
       );
       picker.style.left = `${left}px`;
       picker.style.top = `${top}px`;
-      picker.style.visibility = "";
+      picker.removeClass("vox-voice-picker--hidden");
     });
 
     picker.addEventListener("mouseenter", () => {

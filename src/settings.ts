@@ -63,7 +63,7 @@ export const DEFAULT_SETTINGS: VoxSettings = {
 };
 
 function section(containerEl: HTMLElement, title: string, desc?: string) {
-  containerEl.createEl("h3", { text: title });
+  new Setting(containerEl).setName(title).setHeading();
   if (desc) {
     containerEl.createEl("p", { text: desc, cls: "setting-item-description" });
   }
@@ -82,7 +82,7 @@ export class VoxSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Vox" });
+    new Setting(containerEl).setName("Vox").setHeading();
 
     new Setting(containerEl)
       .setName("Provider")
@@ -259,18 +259,22 @@ export class VoxSettingTab extends PluginSettingTab {
             title: isDefault ? "Default" : "Click to set as default",
           });
           chip.createEl("span", { text: voice.name, cls: "vox-voice-chip-name" });
-          chip.addEventListener("click", async (e) => {
+          chip.addEventListener("click", (e) => {
             if ((e.target as HTMLElement).closest(".vox-voice-chip-remove")) return;
             s.voiceElevenlabs = voice.id;
-            await this.plugin.saveSettings();
-            this.display();
+            void this.plugin.saveSettings().then(
+              () => this.display(),
+              (err) => console.error("Vox: failed to save ElevenLabs voice", err),
+            );
           });
           const x = chip.createEl("span", { cls: "vox-voice-chip-remove", text: "×" });
-          x.addEventListener("click", async () => {
+          x.addEventListener("click", () => {
             s.elevenlabsVoices = s.elevenlabsVoices.filter((v) => v.id !== voice.id);
             if (s.voiceElevenlabs === voice.id) s.voiceElevenlabs = s.elevenlabsVoices[0]?.id ?? "";
-            await this.plugin.saveSettings();
-            this.display();
+            void this.plugin.saveSettings().then(
+              () => this.display(),
+              (err) => console.error("Vox: failed to remove ElevenLabs voice", err),
+            );
           });
         }
       }

@@ -13,7 +13,7 @@ export class BrowserSynthProvider implements SynthProvider {
   readonly kind = "synth" as const;
   private utterances: SpeechSynthesisUtterance[] = [];
 
-  async speakAll(
+  speakAll(
     sentences: string[],
     voice: string,
     rate: number,
@@ -44,6 +44,8 @@ export class BrowserSynthProvider implements SynthProvider {
       this.utterances.push(u);
       window.speechSynthesis.speak(u);
     });
+
+    return Promise.resolve();
   }
 
   pause(): void {

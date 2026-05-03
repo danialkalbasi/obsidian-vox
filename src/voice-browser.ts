@@ -136,14 +136,18 @@ export class VoiceBrowserModal extends Modal {
         cls: "vox-browser-btn vox-browser-btn--add",
         text: "Add",
       });
-      addBtn.addEventListener("click", async () => {
+      addBtn.addEventListener("click", () => {
         this.plugin.settings.elevenlabsVoices.push({ name: voice.name, id: voice.voice_id });
         if (!this.plugin.settings.voiceElevenlabs) {
           this.plugin.settings.voiceElevenlabs = voice.voice_id;
         }
-        await this.plugin.saveSettings();
-        this.onAdd();
-        this.renderList();
+        void this.plugin.saveSettings().then(
+          () => {
+            this.onAdd();
+            this.renderList();
+          },
+          (err) => console.error("Vox: failed to save ElevenLabs voice", err),
+        );
       });
     }
   }

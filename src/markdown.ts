@@ -66,8 +66,19 @@ export function stripMarkdown(md: string): string {
  * (., !, ?, newlines) and leaves edge cases like "Dr. Smith" alone.
  */
 export function splitIntoSentences(text: string): string[] {
-  const raw = text
-    .split(/(?<=[.!?])\s+(?=[A-Z"'([])|\n\n+/)
+  const normalized = text.replace(/\n{2,}/g, "\u0000");
+  const raw = normalized
+    .split(/([.!?])\s+(?=[A-Z"'([])|\u0000/)
+    .reduce<string[]>((parts, chunk, index, arr) => {
+      if (index % 2 === 1) {
+        const prev = parts.pop() ?? "";
+        parts.push(prev + chunk);
+        return parts;
+      }
+      if (chunk.length > 0) parts.push(chunk);
+      return parts;
+    }, [])
+    .flatMap((chunk) => chunk.split("\u0000"))
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
