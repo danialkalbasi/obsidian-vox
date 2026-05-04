@@ -89,8 +89,8 @@ export class VoxSettingTab extends PluginSettingTab {
       .setDesc("Which service reads your notes aloud.")
       .addDropdown((dd) =>
         dd
-          .addOption("elevenlabs", "ElevenLabs voices")
-          .addOption("openai", "OpenAI voices")
+          .addOption("elevenlabs", "Voice library")
+          .addOption("openai", "Generated voices")
           .addOption("browser", "Browser (free, no account needed)")
           .setValue(s.engine)
           .onChange(async (value) => {
@@ -147,7 +147,7 @@ export class VoxSettingTab extends PluginSettingTab {
       section(containerEl, "OpenAI");
       new Setting(containerEl)
         .setName("API key")
-        .setDesc("Paste your OpenAI key here.")
+        .setDesc("Paste your key here.")
         .addText((t) =>
           t
             .setPlaceholder("Paste your API key")
@@ -212,7 +212,7 @@ export class VoxSettingTab extends PluginSettingTab {
       section(containerEl, "ElevenLabs");
       new Setting(containerEl)
         .setName("API key")
-        .setDesc("Paste your ElevenLabs key here. Find it in your profile settings.")
+        .setDesc("Paste your key here. Find it in your profile settings.")
         .addText((t) =>
           t
             .setPlaceholder("Paste your API key")
@@ -360,7 +360,7 @@ export class VoxSettingTab extends PluginSettingTab {
     section(containerEl, "Development");
     new Setting(containerEl)
       .setName("Auto-reload while developing")
-      .setDesc("Reload Vox when main.js, styles.css, or manifest.json changes.")
+      .setDesc("Reload the plugin when a built file changes.")
       .addToggle((tg) =>
         tg.setValue(s.devReloadEnabled).onChange(async (value) => {
           s.devReloadEnabled = value;
