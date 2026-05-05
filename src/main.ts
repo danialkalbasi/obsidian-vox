@@ -122,7 +122,7 @@ export default class VoxPlugin extends Plugin {
     // ── Ribbon icons ────────────────────────────────────────────
     // Single icon: click reads when idle; during playback, controls live
     // in the popover so pause/stop stay grouped with voice controls.
-    this.readRibbonEl = this.addRibbonIcon(ICON_READ, "Vox: read current note", () => {
+    this.readRibbonEl = this.addRibbonIcon(ICON_READ, "Vox: Read current note", () => {
       if (this.player.getState() === "idle") {
         void this.readActiveNote().catch((err) => {
           console.error("Vox: failed to read active note", err);
@@ -137,7 +137,7 @@ export default class VoxPlugin extends Plugin {
     // ── Commands (palette + hotkeys) ────────────────────────────
     this.addCommand({
       id: "read-active-note",
-      name: "Read active note aloud",
+      name: "Vox: Read active note aloud",
       callback: async () => {
         await this.readActiveNote();
       },
@@ -145,13 +145,13 @@ export default class VoxPlugin extends Plugin {
 
     this.addCommand({
       id: "stop-reading",
-      name: "Stop reading",
+      name: "Vox: Stop reading",
       callback: () => this.player.stop(),
     });
 
     this.addCommand({
       id: "toggle-play-pause",
-      name: "Toggle play / pause",
+      name: "Vox: Toggle play / pause",
       callback: () => this.player.togglePause(),
     });
 
@@ -161,7 +161,7 @@ export default class VoxPlugin extends Plugin {
         if (!(file instanceof TFile) || file.extension !== "md") return;
         menu.addItem((item) => {
           item
-            .setTitle("Vox: read aloud")
+            .setTitle("Vox: Read aloud")
             .setIcon(ICON_READ)
             .onClick(async () => {
               await this.readFile(file);
@@ -239,7 +239,7 @@ export default class VoxPlugin extends Plugin {
 
     this.devReloading = true;
     this.stopDevReload();
-    new Notice("Vox: reloading plugin...");
+    new Notice("Vox: Reloading plugin...");
     await manager.disablePlugin(this.manifest.id);
     await manager.enablePlugin(this.manifest.id);
   }
@@ -460,7 +460,7 @@ export default class VoxPlugin extends Plugin {
   private renderState(state: PlayerState) {
     if (this.readRibbonEl) {
       const icon = state === "idle" ? ICON_READ : state === "playing" ? ICON_PAUSE : ICON_PLAY;
-      const label = state === "idle" ? "Vox: read current note" : "Vox: playback controls";
+      const label = state === "idle" ? "Vox: Read current note" : "Vox: Playback controls";
       setIcon(this.readRibbonEl, icon);
       this.readRibbonEl.setAttribute("aria-label", label);
     }
@@ -475,7 +475,7 @@ export default class VoxPlugin extends Plugin {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     const file = view?.file;
     if (!file) {
-      new Notice("Vox: no active note to read.");
+      new Notice("Vox: No active note to read.");
       return;
     }
     await this.readFile(file);
@@ -498,7 +498,7 @@ export default class VoxPlugin extends Plugin {
       this.player.setRate(this.settings.rate);
       await this.player.play(text, voice);
       if (this.settings.showStartNotice) {
-        new Notice(`Vox: reading "${file.basename}"...`);
+        new Notice(`Vox: Reading "${file.basename}"...`);
       }
     } catch (err) {
       console.error("Vox playback failed:", err);

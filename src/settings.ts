@@ -89,8 +89,8 @@ export class VoxSettingTab extends PluginSettingTab {
       .setDesc("Which service reads your notes aloud.")
       .addDropdown((dd) =>
         dd
-          .addOption("elevenlabs", "Voice library")
-          .addOption("openai", "Generated voices")
+          .addOption("elevenlabs", "ElevenLabs")
+          .addOption("openai", "OpenAI")
           .addOption("browser", "Browser (free, no account needed)")
           .setValue(s.engine)
           .onChange(async (value) => {
@@ -118,7 +118,7 @@ export class VoxSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Show start notification")
-      .setDesc('Show a notice like "vox: reading ..." when playback begins.')
+      .setDesc("Show a notice when playback begins.")
       .addToggle((tg) =>
         tg.setValue(s.showStartNotice).onChange(async (value) => {
           s.showStartNotice = value;
@@ -131,7 +131,7 @@ export class VoxSettingTab extends PluginSettingTab {
       section(containerEl, "Browser");
       new Setting(containerEl)
         .setName("Voice")
-        .setDesc("Name of the voice to use, e.g. Samantha or alex on macOS. Leave blank for the system default.")
+        .setDesc("Name of the voice to use. Leave blank for the system default.")
         .addText((t) =>
           t
             .setPlaceholder("Samantha")
@@ -159,7 +159,7 @@ export class VoxSettingTab extends PluginSettingTab {
         );
       new Setting(containerEl)
         .setName("Model")
-        .setDesc("Standard is faster, hd sounds better.")
+        .setDesc("Standard is faster. Higher quality sounds better.")
         .addDropdown((dd) =>
           dd
             .addOption("tts-1", "Standard")
@@ -294,7 +294,7 @@ export class VoxSettingTab extends PluginSettingTab {
         .addButton((button) =>
           button.setButtonText("Clear").onClick(async () => {
             await new AudioCache(this.plugin).clear();
-            new Notice("Vox: audio cache cleared.");
+            new Notice("Vox: Audio cache cleared.");
           }),
         );
     }
