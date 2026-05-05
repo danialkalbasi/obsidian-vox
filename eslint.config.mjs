@@ -16,7 +16,7 @@ export default defineConfig([
       "obsidianmd/ui/sentence-case": [
         "warn",
         {
-          brands: ["OpenAI", "ElevenLabs", "GitHub"],
+          brands: ["OpenAI", "ElevenLabs", "GitHub", "Markdown"],
           acronyms: ["API", "TTS", "WPM", "HTML", "JSON", "CSS", "SVG", "OS", "URL", "ID", "CTA"],
         },
       ],

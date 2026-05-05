@@ -487,7 +487,7 @@ export default class VoxPlugin extends Plugin {
     const raw = await this.app.vault.cachedRead(file);
     const text = stripMarkdown(raw);
     if (!text.trim()) {
-      new Notice("The note is empty after stripping markdown.");
+      new Notice("The note is empty after stripping Markdown.");
       return;
     }
 
